@@ -10,7 +10,13 @@ import {
   calculateStrategyTargets, 
   getOptimalStrategy,
   getStrategyRecommendation,
-  calculatePositionSize
+  calculatePositionSize,
+  calculateAdaptiveParams,
+  getMarketRegime,
+  analyzeStatisticalArbitrage,
+  analyzeMomentumBreakout,
+  analyzeOrderFlow,
+  StrategyPerformance
 } from "./trading-strategies";
 import type { Mt5Config } from "~backend/user/api";
 
@@ -30,6 +36,16 @@ export interface TradingSignal {
   chartUrl?: string;
   strategyRecommendation: string;
   analysis: any;
+  // Enhanced fields
+  marketRegime?: any;
+  adaptiveParams?: any;
+  strategySpecificAnalysis?: any;
+  riskMetrics?: {
+    var95: number;
+    expectedShortfall: number;
+    drawdownRisk: number;
+    leverageAdjusted: boolean;
+  };
 }
 
 export async function generateSignalForSymbol(
@@ -63,7 +79,16 @@ export async function generateSignalForSymbol(
   if ((marketData as any)["1m"]) completeMarketData["1m"] = (marketData as any)["1m"];
   if ((marketData as any)["1h"]) completeMarketData["1h"] = (marketData as any)["1h"];
   
-  const optimalStrategy = getOptimalStrategy(completeMarketData, symbol, userStrategy);
+  // Get historical performance data (would come from database in real implementation)
+  const historicalPerformance = new Map<TradingStrategy, StrategyPerformance>();
+  
+  const optimalStrategy = getOptimalStrategy(
+    completeMarketData, 
+    symbol, 
+    userStrategy, 
+    aiAnalysis, 
+    historicalPerformance
+  );
   
   console.log(`Performing AI analysis for ${symbol} with strategy ${optimalStrategy}`);
   const aiAnalysis = await analyzeWithAI(completeMarketData, symbol, optimalStrategy);
@@ -78,13 +103,103 @@ export async function generateSignalForSymbol(
   const atr = completeMarketData["5m"].indicators.atr;
   const spread = completeMarketData["5m"].spread;
   
-  const priceTargets = calculateStrategyTargets(
-    optimalStrategy, currentPrice, atr, aiAnalysis.direction, symbol, spread
+  // Calculate adaptive parameters
+  const adaptiveParams = calculateAdaptiveParams(
+    optimalStrategy,
+    completeMarketData,
+    aiAnalysis
   );
   
-  const recommendedLotSize = calculatePositionSize(
+  // Get market regime
+  const marketRegime = getMarketRegime(completeMarketData, aiAnalysis);
+  
+  // Strategy-specific analysis
+  let strategySpecificAnalysis: any = {};
+  
+  switch (optimalStrategy) {
+    case TradingStrategy.STATISTICAL_ARBITRAGE:
+      strategySpecificAnalysis = analyzeStatisticalArbitrage(
+        completeMarketData, symbol, aiAnalysis
+      );
+      break;
+    
+    case TradingStrategy.MOMENTUM_BREAKOUT:
+      strategySpecificAnalysis = analyzeMomentumBreakout(
+        completeMarketData, symbol, aiAnalysis
+      );
+      break;
+    
+    case TradingStrategy.ORDER_FLOW:
+      strategySpecificAnalysis = analyzeOrderFlow(
+        completeMarketData, symbol, aiAnalysis
+      );
+      break;
+    
+    default:
+      // Use standard analysis for other strategies
+      strategySpecificAnalysis = {
+        signal: aiAnalysis.direction,
+        confidence: aiAnalysis.confidence,
+        analysis: "Standard technical analysis"
+      };
+  }
+  
+  // Override direction if strategy-specific analysis provides better signal
+  if (strategySpecificAnalysis.signal && 
+      strategySpecificAnalysis.confidence > aiAnalysis.confidence) {
+    aiAnalysis.direction = strategySpecificAnalysis.signal;
+    aiAnalysis.confidence = strategySpecificAnalysis.confidence;
+  }
+  
+  const priceTargets = calculateStrategyTargets(
+    optimalStrategy, 
+    currentPrice, 
+    atr, 
+    aiAnalysis.direction, 
+    symbol, 
+    spread,
+    completeMarketData,
+    aiAnalysis,
+    adaptiveParams
+  );
+  
+  // Enhanced position sizing with adaptive parameters
+  let basePositionSize = calculatePositionSize(
     optimalStrategy, accountBalance, riskPercentage, priceTargets.riskAmount
   );
+  
+  // Apply adaptive adjustments
+  const strategyConfig = TRADING_STRATEGIES[optimalStrategy];
+  let adjustedLotSize = basePositionSize;
+  
+  // Market regime adjustments
+  if (marketRegime.type === "CRISIS") {
+    adjustedLotSize *= 0.5; // Reduce size in crisis
+  } else if (marketRegime.type === "TRENDING" && marketRegime.confidence > 0.8) {
+    adjustedLotSize *= Math.min(1.3, strategyConfig.leverageMultiplier); // Increase in strong trends
+  }
+  
+  // ML confidence adjustments
+  if (aiAnalysis.enhancedConfidence?.mlScore) {
+    const mlScore = aiAnalysis.enhancedConfidence.mlScore;
+    if (mlScore > 80) {
+      adjustedLotSize *= 1.2;
+    } else if (mlScore < 60) {
+      adjustedLotSize *= 0.8;
+    }
+  }
+  
+  // Strategy-specific sizing
+  if (optimalStrategy === TradingStrategy.PAIRS_TRADING || 
+      optimalStrategy === TradingStrategy.STATISTICAL_ARBITRAGE) {
+    // Market-neutral strategies can use higher leverage
+    adjustedLotSize *= strategyConfig.leverageMultiplier;
+  }
+  
+  const recommendedLotSize = Math.max(0.01, Math.min(
+    adjustedLotSize, 
+    strategyConfig.maxLotSize
+  ));
   
   const strategyRecommendation = getStrategyRecommendation(optimalStrategy, completeMarketData, aiAnalysis);
   
@@ -96,6 +211,16 @@ export async function generateSignalForSymbol(
   const maxHoldingTimeHours = Number(strategyConfig.maxHoldingTime);
   const expiresAt = calculateExpirationTime(optimalStrategy, maxHoldingTimeHours);
 
+  // Calculate advanced risk metrics
+  const riskMetrics = calculateAdvancedRiskMetrics(
+    optimalStrategy,
+    priceTargets,
+    recommendedLotSize,
+    accountBalance,
+    marketRegime,
+    aiAnalysis
+  );
+  
   const signal: TradingSignal = {
     tradeId,
     symbol,
@@ -117,11 +242,28 @@ export async function generateSignalForSymbol(
       professional: aiAnalysis.professionalAnalysis,
       sentiment: { ...sentimentAnalysis, summary: sentimentAnalysis.summary },
       volatility: aiAnalysis.volatility,
-      strategy: { name: strategyConfig.name, description: strategyConfig.description, timeframes: strategyConfig.timeframes, marketConditions: strategyConfig.marketConditions, riskLevel },
+      strategy: { 
+        name: strategyConfig.name, 
+        description: strategyConfig.description, 
+        timeframes: strategyConfig.timeframes, 
+        marketConditions: strategyConfig.marketConditions, 
+        riskLevel,
+        adaptiveParameters: strategyConfig.adaptiveParameters,
+        mlDriven: strategyConfig.mlDriven,
+        institutionalAlignment: strategyConfig.institutionalAlignment
+      },
       enhancedTechnical: aiAnalysis.enhancedTechnical,
       vwap: aiAnalysis.vwap,
       dataSource: completeMarketData["5m"].source,
+      // New enhanced analysis
+      institutionalAnalysis: aiAnalysis.institutionalAnalysis,
+      enhancedConfidence: aiAnalysis.enhancedConfidence
     },
+    // Enhanced fields
+    marketRegime,
+    adaptiveParams,
+    strategySpecificAnalysis,
+    riskMetrics
   };
 
   return signal;
@@ -163,6 +305,70 @@ function determineRiskLevel(strategy: TradingStrategy, aiAnalysis: any, marketDa
   if (riskScore <= 1) return "LOW";
   if (riskScore <= 3) return "MEDIUM";
   return "HIGH";
+}
+
+/**
+ * Calculate advanced risk metrics for the trading signal
+ */
+function calculateAdvancedRiskMetrics(
+  strategy: TradingStrategy,
+  priceTargets: any,
+  lotSize: number,
+  accountBalance: number,
+  marketRegime: any,
+  aiAnalysis: any
+): {
+  var95: number;
+  expectedShortfall: number;
+  drawdownRisk: number;
+  leverageAdjusted: boolean;
+} {
+  const config = TRADING_STRATEGIES[strategy];
+  
+  // Calculate Value at Risk (95% confidence level)
+  const riskAmount = priceTargets.riskAmount * lotSize;
+  const accountRiskPercentage = (riskAmount / accountBalance) * 100;
+  
+  // VaR calculation (simplified)
+  let var95 = accountRiskPercentage;
+  
+  // Adjust VaR based on market regime
+  switch (marketRegime.type) {
+    case "CRISIS":
+      var95 *= 2.5; // Much higher risk in crisis
+      break;
+    case "VOLATILE":
+      var95 *= 1.8;
+      break;
+    case "LOW_VOL":
+      var95 *= 0.7;
+      break;
+    default:
+      var95 *= 1.0;
+  }
+  
+  // Expected Shortfall (conditional VaR)
+  const expectedShortfall = var95 * 1.3; // ES is typically 1.3x VaR for normal distribution
+  
+  // Drawdown risk based on strategy characteristics
+  let drawdownRisk = config.drawdownLimit * 100; // Convert to percentage
+  
+  // Adjust for strategy-specific risks
+  if (config.riskModel === "VaR") {
+    drawdownRisk *= 0.8; // VaR-based strategies have better risk control
+  } else if (config.riskModel === "VOLATILITY_BASED") {
+    drawdownRisk *= 1.2; // Vol-based can have larger swings
+  }
+  
+  // Check if leverage is being used
+  const leverageAdjusted = lotSize > config.maxLotSize * 0.8;
+  
+  return {
+    var95: Math.round(var95 * 100) / 100,
+    expectedShortfall: Math.round(expectedShortfall * 100) / 100,
+    drawdownRisk: Math.round(drawdownRisk * 100) / 100,
+    leverageAdjusted
+  };
 }
 
 function calculateMarketVolatility(marketData: any): number {

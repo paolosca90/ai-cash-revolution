@@ -1,9 +1,11 @@
+import React, { memo, useState, useCallback, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { TrendingUp, TrendingDown, Target, Shield, BarChart, Clock, Zap } from "lucide-react";
+import { TrendingUp, TrendingDown, Target, Shield, BarChart, Clock, Zap, Loader2, AlertCircle, CheckCircle2, Activity } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { useToast } from "@/components/ui/use-toast";
 
 interface AutoSignal {
   symbol: string;
@@ -21,6 +23,10 @@ interface AutoSignal {
     trend: string;
     volatility: string;
   };
+  timestamp?: string;
+  status?: 'pending' | 'executed' | 'closed';
+  executionPrice?: number;
+  pnl?: number;
 }
 
 interface AutoSignalCardProps {

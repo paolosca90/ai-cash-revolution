@@ -14,6 +14,10 @@ import {
   calculateEnhancedConfidence,
   EnhancedConfidenceResult
 } from "./enhanced-confidence-system";
+import { advancedFeatureEngine } from "./advanced-feature-engine";
+import { quantitativeOptimizer } from "./quantitative-strategy-optimizer";
+import { advancedRiskManager } from "./advanced-risk-manager";
+import { performanceMonitor } from "./performance-monitor";
 import {
   performInstitutionalAnalysis,
   InstitutionalAnalysis
@@ -179,8 +183,8 @@ export async function analyzeWithAI(marketData: TimeframeData, symbol: string, s
     geminiAnalysis
   );
 
-  // Calculate enhanced confidence with sophisticated scoring
-  const enhancedConfidence = calculateEnhancedConfidence(
+  // Calculate enhanced confidence with sophisticated scoring (now async)
+  const enhancedConfidence = await calculateEnhancedConfidence(
     indicators5m,
     indicators15m, 
     indicators30m,
@@ -188,6 +192,7 @@ export async function analyzeWithAI(marketData: TimeframeData, symbol: string, s
     marketContext,
     enhancedDirection,
     symbol,
+    marketData, // Pass market data for advanced features
     undefined, // historicalWinRate
     institutionalAnalysis // Pass institutional analysis
   );
