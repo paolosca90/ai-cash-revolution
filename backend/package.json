@@ -4,20 +4,15 @@
   "type": "module",
   "packageManager": "bun",
   "scripts": {
-    "build": "cd ../frontend \u0026\u0026 bun install \u0026\u0026 vite build --outDir=../backend/frontend/dist"
+    "build": "cd ../frontend && npm install && npm run build && cp -r dist ../backend/frontend/"
   },
   "dependencies": {
     "encore.dev": "^1.48.8",
     "node-fetch": "^3.3.2",
-    "@tensorflow/tfjs-node": "^4.21.0",
-    "ml-matrix": "^6.11.1",
-    "ml-regression": "^2.0.1",
     "simple-statistics": "^7.8.3",
-    "technicalindicators": "^3.1.0",
-    "ml-kmeans": "^6.0.0",
-    "regression": "^2.0.1",
-    "stripe": "^17.3.1",
-    "nodemailer": "^6.9.14"
+    "bcrypt": "^5.1.1",
+    "jsonwebtoken": "^9.0.2",
+    "crypto-js": "^4.2.0"
   },
   "devDependencies": {
     "typescript": "^5.8.3"

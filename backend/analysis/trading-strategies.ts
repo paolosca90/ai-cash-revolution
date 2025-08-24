@@ -647,38 +647,6 @@ export function getOptimalStrategy(
   }
   
   return bestStrategy;
-  
-  const volatility = calculateMarketVolatility(marketData);
-  const trendStrength = calculateTrendStrength(marketData);
-  
-  // Calcola il tempo rimanente fino alla chiusura di NY (22:00 CET)
-  const now = new Date();
-  const nyCloseHour = 22; // 22:00 CET
-  const currentHour = now.getHours();
-  const hoursUntilNYClose = currentHour < nyCloseHour ? nyCloseHour - currentHour : 24 - currentHour + nyCloseHour;
-  
-  // Se mancano meno di 2 ore alla chiusura NY, forza scalping
-  if (hoursUntilNYClose < 2) {
-    return TradingStrategy.SCALPING;
-  }
-  
-  const scores = {
-    [TradingStrategy.SCALPING]: calculateStrategyScore(TradingStrategy.SCALPING, volatility, trendStrength),
-    [TradingStrategy.INTRADAY]: calculateStrategyScore(TradingStrategy.INTRADAY, volatility, trendStrength)
-  };
-  
-  // Find the strategy with the highest score
-  let bestStrategy = TradingStrategy.INTRADAY;
-  let bestScore = scores[TradingStrategy.INTRADAY];
-  
-  for (const [strategy, score] of Object.entries(scores)) {
-    if (score > bestScore) {
-      bestStrategy = strategy as TradingStrategy;
-      bestScore = score;
-    }
-  }
-  
-  return bestStrategy;
 }
 
 function isStrategyValid(
@@ -1096,7 +1064,7 @@ export function calculateAdaptiveParams(
   };
 }
 
-function getSymbolCharacteristics(symbol: string) {"
+function getSymbolCharacteristics(symbol: string) {
   const characteristics: Record<string, any> = {
     // Cryptocurrencies
     "BTCUSD": {
