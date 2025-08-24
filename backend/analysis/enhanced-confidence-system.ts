@@ -1,1271 +1,761 @@
-/**
- * Enhanced Confidence Calculation System
- * 
- * This module provides sophisticated confidence scoring for trading signals
- * based on multiple factors including technical analysis, market conditions,
- * historical performance, and ML-driven predictions.
- */
+import { api } from "encore.dev/api";
+import { SQLDatabase } from "encore.dev/storage/sqldb";
 
-import { MultiTimeframeAnalysis, MarketConditionContext, EnhancedIndicators } from "./enhanced-technical-analysis";
-import { InstitutionalAnalysis } from "./institutional-analysis";
-import { learningEngine } from "../ml/learning-engine";
-import { advancedFeatureEngine, AdvancedFeatures } from "./advanced-feature-engine";
-import * as ss from 'simple-statistics';
+const db = new SQLDatabase("trading", {
+  migrations: "./migrations",
+});
 
-export interface ConfidenceFactors {
-  technicalAlignment: number; // 0-100
-  multiTimeframeConfluence: number; // 0-100
-  volumeConfirmation: number; // 0-100
-  marketConditions: number; // 0-100
-  historicalPerformance: number; // 0-100
-  riskAdjustment: number; // 0-100
-  momentumStrength: number; // 0-100
-  volatilityFilter: number; // 0-100
-  institutionalAlignment: number; // 0-100
-  orderBlockConfirmation: number; // 0-100
-  liquidityZoneConfirmation: number; // 0-100
-  marketMakerConfidence: number; // 0-100
-  // NEW: ML-driven factors
-  mlModelConfidence: number; // 0-100 ML ensemble prediction confidence
-  featureImportanceScore: number; // 0-100 Based on feature significance
-  patternRecognitionScore: number; // 0-100 Real pattern detection
-  statisticalSignificance: number; // 0-100 Statistical validation
-  crossValidationScore: number; // 0-100 Model generalization
-  anomalyDetectionScore: number; // 0-100 Market anomaly detection
+interface MarketData {
+  timestamp: Date;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  volume: number;
 }
 
-export interface EnhancedConfidenceResult {
-  finalConfidence: number;
-  confidenceGrade: "A+" | "A" | "B+" | "B" | "C" | "D" | "F";
-  factors: ConfidenceFactors;
-  institutionalScore: number;
-  mlScore: number; // NEW: Overall ML confidence score
-  statisticalValidation: { // NEW: Statistical validation metrics
-    pValue: number;
-    confidenceInterval: [number, number];
-    sampleSize: number;
-    effectSize: number;
-  };
-  recommendations: {
-    shouldTrade: boolean;
-    suggestedLotSizeMultiplier: number; // 0.1 to 2.0
-    riskAdjustment: "REDUCE" | "NORMAL" | "INCREASE";
-    timeframeRecommendation: "SHORT_TERM" | "MEDIUM_TERM" | "LONG_TERM";
-    institutionalBias: "STRONG_BULLISH" | "BULLISH" | "NEUTRAL" | "BEARISH" | "STRONG_BEARISH";
-    mlRecommendation: "HIGH_CONFIDENCE" | "MODERATE_CONFIDENCE" | "LOW_CONFIDENCE" | "AVOID"; // NEW
-  };
-  warnings: string[];
+interface TechnicalIndicators {
+  sma20: number;
+  sma50: number;
+  rsi: number;
+  macd: number;
+  macdSignal: number;
+  macdHistogram: number;
+  bollingerUpper: number;
+  bollingerLower: number;
+  bollingerMiddle: number;
+  atr: number;
+  stochK: number;
+  stochD: number;
+  williamsR: number;
+  cci: number;
+  momentum: number;
+  roc: number;
 }
 
-/**
- * Calculate enhanced confidence score with multiple sophisticated factors
- */
+interface MarketConditions {
+  volatility: number;
+  trend: "BULLISH" | "BEARISH" | "SIDEWAYS";
+  volume: "HIGH" | "MEDIUM" | "LOW";
+  support: number;
+  resistance: number;
+}
+
+interface ConfidenceFactors {
+  technicalAlignment: number;
+  marketConditions: number;
+  volumeConfirmation: number;
+  trendStrength: number;
+  riskReward: number;
+  historicalAccuracy: number;
+}
+
+interface EnhancedConfidenceRequest {
+  symbol: string;
+  timeframe: string;
+  signalType: "BUY" | "SELL";
+  baseConfidence: number;
+}
+
+interface EnhancedConfidenceResponse {
+  enhancedConfidence: number;
+  confidenceFactors: ConfidenceFactors;
+  marketConditions: MarketConditions;
+  recommendations: string[];
+  riskLevel: "LOW" | "MEDIUM" | "HIGH";
+}
+
+// Calculates enhanced confidence score for trading signals
 export async function calculateEnhancedConfidence(
-  indicators5m: EnhancedIndicators,
-  indicators15m: EnhancedIndicators,
-  indicators30m: EnhancedIndicators,
-  multiTimeframeAnalysis: MultiTimeframeAnalysis,
-  marketContext: MarketConditionContext,
-  direction: "LONG" | "SHORT",
   symbol: string,
-  marketData?: any,
-  historicalWinRate?: number,
-  institutionalAnalysis?: InstitutionalAnalysis
-): Promise<EnhancedConfidenceResult> {
+  marketData: MarketData[],
+  indicators: TechnicalIndicators,
+  signalType: "BUY" | "SELL",
+  baseConfidence: number
+): Promise<{
+  enhancedConfidence: number;
+  confidenceFactors: ConfidenceFactors;
+  marketConditions: MarketConditions;
+  recommendations: string[];
+  riskLevel: "LOW" | "MEDIUM" | "HIGH";
+}> {
+  // Analyze market conditions
+  const marketConditions = analyzeMarketConditions(marketData, indicators);
   
-  // Extract advanced features if market data is available
-  let advancedFeatures: AdvancedFeatures | null = null;
-  if (marketData) {
-    try {
-      advancedFeatures = await advancedFeatureEngine.extractAdvancedFeatures({
-        open: [marketData['5m'].open, marketData['15m'].open, marketData['30m'].open],
-        high: [marketData['5m'].high, marketData['15m'].high, marketData['30m'].high],
-        low: [marketData['5m'].low, marketData['15m'].low, marketData['30m'].low],
-        close: [marketData['5m'].close, marketData['15m'].close, marketData['30m'].close],
-        volume: [marketData['5m'].volume, marketData['15m'].volume, marketData['30m'].volume],
-        timestamp: [Date.now() - 1800000, Date.now() - 900000, Date.now()]
-      }, symbol);
-    } catch (error) {
-      console.error('Error extracting advanced features:', error);
-    }
+  // Calculate confidence factors
+  const confidenceFactors = calculateConfidenceFactors(
+    indicators,
+    marketConditions,
+    signalType,
+    marketData
+  );
+  
+  // Apply dynamic thresholds based on market conditions
+  const adjustedFactors = applyDynamicThresholds(confidenceFactors, marketConditions);
+  
+  // Calculate weighted confidence score
+  const enhancedConfidence = calculateWeightedConfidence(baseConfidence, adjustedFactors);
+  
+  // Generate recommendations
+  const recommendations = generateRecommendations(
+    confidenceFactors,
+    marketConditions,
+    signalType
+  );
+  
+  // Determine risk level
+  const riskLevel = determineRiskLevel(enhancedConfidence, marketConditions);
+  
+  return {
+    enhancedConfidence,
+    confidenceFactors: adjustedFactors,
+    marketConditions,
+    recommendations,
+    riskLevel
+  };
+}
+
+function analyzeMarketConditions(
+  marketData: MarketData[],
+  indicators: TechnicalIndicators
+): MarketConditions {
+  const prices = marketData.map(d => d.close);
+  const volumes = marketData.map(d => d.volume);
+  
+  // Calculate volatility
+  const volatility = calculateVolatility(prices);
+  
+  // Determine trend
+  const trend = determineTrend(indicators);
+  
+  // Analyze volume
+  const avgVolume = volumes.reduce((a, b) => a + b, 0) / volumes.length;
+  const currentVolume = volumes[volumes.length - 1];
+  const volumeRatio = currentVolume / avgVolume;
+  
+  let volume: "HIGH" | "MEDIUM" | "LOW";
+  if (volumeRatio > 1.5) volume = "HIGH";
+  else if (volumeRatio > 0.8) volume = "MEDIUM";
+  else volume = "LOW";
+  
+  // Calculate support and resistance
+  const { support, resistance } = calculateSupportResistance(marketData);
+  
+  return {
+    volatility,
+    trend,
+    volume,
+    support,
+    resistance
+  };
+}
+
+function calculateVolatility(prices: number[]): number {
+  const returns = [];
+  for (let i = 1; i < prices.length; i++) {
+    returns.push((prices[i] - prices[i - 1]) / prices[i - 1]);
   }
   
-  // Get ML predictions and confidence
-  const mlPrediction = await getMlPredictionConfidence(indicators5m, indicators15m, indicators30m, symbol, advancedFeatures);
+  const mean = returns.reduce((a, b) => a + b, 0) / returns.length;
+  const variance = returns.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / returns.length;
   
-  const factors: ConfidenceFactors = {
-    technicalAlignment: calculateTechnicalAlignment(indicators5m, indicators15m, indicators30m, direction),
-    multiTimeframeConfluence: multiTimeframeAnalysis.confluence,
-    volumeConfirmation: calculateVolumeConfirmation(indicators5m, indicators15m, indicators30m),
-    marketConditions: calculateMarketConditionsScore(marketContext, multiTimeframeAnalysis),
-    historicalPerformance: calculateHistoricalPerformanceScore(historicalWinRate, symbol),
-    riskAdjustment: calculateRiskAdjustmentScore(multiTimeframeAnalysis, marketContext),
-    momentumStrength: calculateMomentumStrength(indicators5m, indicators15m, direction),
-    volatilityFilter: calculateVolatilityFilterScore(multiTimeframeAnalysis, marketContext),
-    institutionalAlignment: calculateInstitutionalAlignment(institutionalAnalysis, direction),
-    orderBlockConfirmation: calculateOrderBlockConfirmation(institutionalAnalysis, direction),
-    liquidityZoneConfirmation: calculateLiquidityZoneConfirmation(institutionalAnalysis, direction),
-    marketMakerConfidence: calculateMarketMakerConfidence(institutionalAnalysis),
-    // NEW: ML-driven factors
-    mlModelConfidence: mlPrediction.confidence * 100,
-    featureImportanceScore: calculateFeatureImportanceScore(advancedFeatures),
-    patternRecognitionScore: calculatePatternRecognitionScore(marketData, symbol),
-    statisticalSignificance: calculateStatisticalSignificance(indicators5m, indicators15m, indicators30m),
-    crossValidationScore: mlPrediction.crossValidationScore * 100,
-    anomalyDetectionScore: calculateAnomalyDetectionScore(advancedFeatures)
-  };
+  return Math.sqrt(variance);
+}
 
-  // Calculate weighted confidence score
-  const weightedConfidence = calculateWeightedConfidence(factors);
+function determineTrend(indicators: TechnicalIndicators): "BULLISH" | "BEARISH" | "SIDEWAYS" {
+  let bullishSignals = 0;
+  let bearishSignals = 0;
   
-  // Calculate institutional score separately
-  const institutionalScore = calculateInstitutionalScore(factors);
+  // SMA trend
+  if (indicators.sma20 > indicators.sma50) bullishSignals++;
+  else bearishSignals++;
   
-  // Calculate ML score separately
-  const mlScore = calculateMlScore(factors);
+  // MACD trend
+  if (indicators.macd > indicators.macdSignal) bullishSignals++;
+  else bearishSignals++;
   
-  // Calculate statistical validation
-  const statisticalValidation = calculateStatisticalValidation(factors, indicators5m, indicators15m, indicators30m);
+  // RSI trend
+  if (indicators.rsi > 50) bullishSignals++;
+  else bearishSignals++;
   
-  // Apply dynamic thresholds based on market conditions and ML insights
-  const finalConfidence = applyDynamicThresholds(weightedConfidence, marketContext, multiTimeframeAnalysis, mlPrediction);
-  
-  // Determine confidence grade
-  const confidenceGrade = getConfidenceGrade(finalConfidence);
-  
-  // Generate enhanced recommendations
-  const recommendations = generateEnhancedRecommendations(finalConfidence, factors, marketContext, institutionalAnalysis, mlPrediction);
-  
-  // Generate warnings with ML insights
-  const warnings = generateEnhancedWarnings(factors, marketContext, multiTimeframeAnalysis, mlPrediction, advancedFeatures);
+  if (bullishSignals > bearishSignals) return "BULLISH";
+  if (bearishSignals > bullishSignals) return "BEARISH";
+  return "SIDEWAYS";
+}
 
+function calculateSupportResistance(marketData: MarketData[]): { support: number; resistance: number } {
+  const highs = marketData.map(d => d.high);
+  const lows = marketData.map(d => d.low);
+  
+  // Simple support/resistance calculation
+  const support = Math.min(...lows.slice(-20));
+  const resistance = Math.max(...highs.slice(-20));
+  
+  return { support, resistance };
+}
+
+function calculateConfidenceFactors(
+  indicators: TechnicalIndicators,
+  marketConditions: MarketConditions,
+  signalType: "BUY" | "SELL",
+  marketData: MarketData[]
+): ConfidenceFactors {
+  // Technical alignment score
+  const technicalAlignment = calculateTechnicalAlignment(indicators, signalType);
+  
+  // Market conditions score
+  const marketConditionsScore = calculateMarketConditionsScore(marketConditions, signalType);
+  
+  // Volume confirmation score
+  const volumeConfirmation = calculateVolumeConfirmation(marketConditions, signalType);
+  
+  // Trend strength score
+  const trendStrength = calculateTrendStrength(indicators, marketConditions);
+  
+  // Risk/reward ratio
+  const riskReward = calculateRiskReward(marketData, marketConditions, signalType);
+  
+  // Historical accuracy (simplified)
+  const historicalAccuracy = 0.7; // Would be calculated from historical data
+  
   return {
-    finalConfidence,
-    confidenceGrade,
-    factors,
-    institutionalScore,
-    mlScore,
-    statisticalValidation,
-    recommendations,
-    warnings
+    technicalAlignment,
+    marketConditions: marketConditionsScore,
+    volumeConfirmation,
+    trendStrength,
+    riskReward,
+    historicalAccuracy
   };
 }
 
-/**
- * Calculate technical indicator alignment score
- */
 function calculateTechnicalAlignment(
-  indicators5m: EnhancedIndicators,
-  indicators15m: EnhancedIndicators,
-  indicators30m: EnhancedIndicators,
-  direction: "LONG" | "SHORT"
+  indicators: TechnicalIndicators,
+  signalType: "BUY" | "SELL"
 ): number {
   let alignmentScore = 0;
-  let totalWeight = 0;
-
-  // RSI alignment across timeframes
-  const rsiScores = [indicators5m.rsi, indicators15m.rsi, indicators30m.rsi];
-  const rsiWeight = 3;
+  let totalIndicators = 0;
   
-  if (direction === "LONG") {
-    // Look for oversold conditions or bullish momentum
-    const oversoldCount = rsiScores.filter(rsi => rsi < 40).length;
-    const bullishMomentum = rsiScores.filter(rsi => rsi > 50 && rsi < 70).length;
-    alignmentScore += (oversoldCount * 10 + bullishMomentum * 5) * rsiWeight;
-  } else {
-    // Look for overbought conditions or bearish momentum
-    const overboughtCount = rsiScores.filter(rsi => rsi > 60).length;
-    const bearishMomentum = rsiScores.filter(rsi => rsi < 50 && rsi > 30).length;
-    alignmentScore += (overboughtCount * 10 + bearishMomentum * 5) * rsiWeight;
+  if (signalType === "BUY") {
+    // RSI oversold
+    if (indicators.rsi < 30) alignmentScore += 1;
+    else if (indicators.rsi < 50) alignmentScore += 0.5;
+    totalIndicators++;
+    
+    // MACD bullish
+    if (indicators.macd > indicators.macdSignal) alignmentScore += 1;
+    totalIndicators++;
+    
+    // Price above SMA
+    if (indicators.sma20 > indicators.sma50) alignmentScore += 1;
+    totalIndicators++;
+    
+    // Stochastic oversold
+    if (indicators.stochK < 20) alignmentScore += 1;
+    else if (indicators.stochK < 50) alignmentScore += 0.5;
+    totalIndicators++;
+    
+  } else { // SELL
+    // RSI overbought
+    if (indicators.rsi > 70) alignmentScore += 1;
+    else if (indicators.rsi > 50) alignmentScore += 0.5;
+    totalIndicators++;
+    
+    // MACD bearish
+    if (indicators.macd < indicators.macdSignal) alignmentScore += 1;
+    totalIndicators++;
+    
+    // Price below SMA
+    if (indicators.sma20 < indicators.sma50) alignmentScore += 1;
+    totalIndicators++;
+    
+    // Stochastic overbought
+    if (indicators.stochK > 80) alignmentScore += 1;
+    else if (indicators.stochK > 50) alignmentScore += 0.5;
+    totalIndicators++;
   }
-  totalWeight += rsiWeight * 15; // Max possible score for RSI
-
-  // MACD alignment
-  const macdWeight = 4;
-  const macds = [indicators5m.macd, indicators15m.macd, indicators30m.macd];
   
-  macds.forEach(macd => {
-    if (direction === "LONG") {
-      if (macd.line > macd.signal && macd.histogram > 0) alignmentScore += 15 * macdWeight;
-      else if (macd.line > macd.signal) alignmentScore += 10 * macdWeight;
-      else if (macd.histogram > 0) alignmentScore += 5 * macdWeight;
-    } else {
-      if (macd.line < macd.signal && macd.histogram < 0) alignmentScore += 15 * macdWeight;
-      else if (macd.line < macd.signal) alignmentScore += 10 * macdWeight;
-      else if (macd.histogram < 0) alignmentScore += 5 * macdWeight;
-    }
-  });
-  totalWeight += 15 * macds.length * macdWeight;
-
-  // Moving average alignment
-  const maWeight = 2;
-  const smaAlignments = [indicators5m.sma, indicators15m.sma, indicators30m.sma];
-  
-  smaAlignments.forEach(sma => {
-    if (direction === "LONG") {
-      if (sma.sma20 > sma.sma50 && sma.sma50 > sma.sma200) alignmentScore += 20 * maWeight;
-      else if (sma.sma20 > sma.sma50) alignmentScore += 10 * maWeight;
-    } else {
-      if (sma.sma20 < sma.sma50 && sma.sma50 < sma.sma200) alignmentScore += 20 * maWeight;
-      else if (sma.sma20 < sma.sma50) alignmentScore += 10 * maWeight;
-    }
-  });
-  totalWeight += 20 * smaAlignments.length * maWeight;
-
-  return Math.min(100, (alignmentScore / totalWeight) * 100);
+  return alignmentScore / totalIndicators;
 }
 
-/**
- * Calculate volume confirmation score
- */
-function calculateVolumeConfirmation(
-  indicators5m: EnhancedIndicators,
-  indicators15m: EnhancedIndicators,
-  indicators30m: EnhancedIndicators
-): number {
-  // This is a placeholder - in real implementation, volume analysis would be more sophisticated
-  // For now, we'll use a simplified approach based on momentum indicators
-  
-  const momentum5m = indicators5m.momentum.momentum;
-  const momentum15m = indicators15m.momentum.momentum;
-  const momentum30m = indicators30m.momentum.momentum;
-  
-  const momentumAlignment = [momentum5m, momentum15m, momentum30m].filter(m => 
-    Math.sign(momentum5m) === Math.sign(m)
-  ).length;
-  
-  // Higher alignment suggests volume confirmation
-  return (momentumAlignment / 3) * 100;
-}
-
-/**
- * Calculate market conditions score
- */
 function calculateMarketConditionsScore(
-  marketContext: MarketConditionContext,
-  multiTimeframeAnalysis: MultiTimeframeAnalysis
+  marketConditions: MarketConditions,
+  signalType: "BUY" | "SELL"
 ): number {
-  let score = 50; // Base score
-  
-  // Session-based scoring
-  switch (marketContext.sessionType) {
-    case "OVERLAP":
-      score += 20; // High activity periods are better
-      break;
-    case "EUROPEAN":
-    case "US":
-      score += 10;
-      break;
-    case "ASIAN":
-      score += 5;
-      break;
-    case "DEAD":
-      score -= 20; // Penalize low activity periods
-      break;
-  }
-  
-  // Volatility-based scoring
-  switch (multiTimeframeAnalysis.volatilityState) {
-    case "NORMAL":
-      score += 10; // Ideal volatility
-      break;
-    case "LOW":
-      score -= 5; // Harder to profit
-      break;
-    case "HIGH":
-      score -= 10; // Higher risk
-      break;
-    case "EXTREME":
-      score -= 25; // Dangerous conditions
-      break;
-  }
-  
-  // Trend strength bonus
-  score += marketContext.trendStrength * 20;
-  
-  // Market noise penalty
-  score -= marketContext.marketNoise * 15;
-  
-  return Math.min(100, Math.max(0, score));
-}
-
-/**
- * Calculate historical performance score
- */
-function calculateHistoricalPerformanceScore(
-  historicalWinRate?: number,
-  symbol?: string
-): number {
-  if (!historicalWinRate) {
-    return 60; // Neutral if no history
-  }
-  
-  // Convert win rate to confidence boost/penalty
-  if (historicalWinRate > 0.7) return 90;
-  if (historicalWinRate > 0.6) return 80;
-  if (historicalWinRate > 0.5) return 70;
-  if (historicalWinRate > 0.4) return 60;
-  if (historicalWinRate > 0.3) return 50;
-  return 30;
-}
-
-/**
- * Calculate risk adjustment score
- */
-function calculateRiskAdjustmentScore(
-  multiTimeframeAnalysis: MultiTimeframeAnalysis,
-  marketContext: MarketConditionContext
-): number {
-  let score = 70; // Base risk score
-  
-  // Adjust based on volatility
-  switch (multiTimeframeAnalysis.volatilityState) {
-    case "LOW":
-      score += 15; // Lower risk
-      break;
-    case "NORMAL":
-      score += 10;
-      break;
-    case "HIGH":
-      score -= 10;
-      break;
-    case "EXTREME":
-      score -= 30; // Very high risk
-      break;
-  }
-  
-  // Adjust based on trend alignment
-  switch (multiTimeframeAnalysis.trendAlignment) {
-    case "STRONG_BULL":
-    case "STRONG_BEAR":
-      score += 15; // Strong trends are more predictable
-      break;
-    case "BULL":
-    case "BEAR":
-      score += 5;
-      break;
-    case "NEUTRAL":
-      score -= 10; // Neutral trends are riskier
-      break;
-  }
-  
-  return Math.min(100, Math.max(0, score));
-}
-
-/**
- * Calculate momentum strength score
- */
-function calculateMomentumStrength(
-  indicators5m: EnhancedIndicators,
-  indicators15m: EnhancedIndicators,
-  direction: "LONG" | "SHORT"
-): number {
-  const roc5m = indicators5m.momentum.roc;
-  const roc15m = indicators15m.momentum.roc;
-  
-  // Check momentum alignment with direction
   let score = 0;
   
-  if (direction === "LONG") {
-    if (roc5m > 0 && roc15m > 0) score += 40;
-    else if (roc5m > 0 || roc15m > 0) score += 20;
-    
-    // Bonus for accelerating momentum
-    if (roc5m > roc15m && roc5m > 0) score += 20;
-  } else {
-    if (roc5m < 0 && roc15m < 0) score += 40;
-    else if (roc5m < 0 || roc15m < 0) score += 20;
-    
-    // Bonus for accelerating momentum
-    if (roc5m < roc15m && roc5m < 0) score += 20;
-  }
+  // Trend alignment
+  if (signalType === "BUY" && marketConditions.trend === "BULLISH") score += 0.4;
+  else if (signalType === "SELL" && marketConditions.trend === "BEARISH") score += 0.4;
+  else if (marketConditions.trend === "SIDEWAYS") score += 0.2;
   
-  // MACD momentum confirmation
-  const macd5m = indicators5m.macd;
-  if (direction === "LONG" && macd5m.histogram > 0) score += 20;
-  if (direction === "SHORT" && macd5m.histogram < 0) score += 20;
+  // Volatility consideration
+  if (marketConditions.volatility < 0.02) score += 0.3; // Low volatility is good
+  else if (marketConditions.volatility < 0.05) score += 0.2;
+  else score += 0.1; // High volatility reduces confidence
   
-  return Math.min(100, score);
+  // Volume confirmation
+  if (marketConditions.volume === "HIGH") score += 0.3;
+  else if (marketConditions.volume === "MEDIUM") score += 0.2;
+  else score += 0.1;
+  
+  return Math.min(score, 1);
 }
 
-/**
- * Calculate volatility filter score
- */
-function calculateVolatilityFilterScore(
-  multiTimeframeAnalysis: MultiTimeframeAnalysis,
-  marketContext: MarketConditionContext
+function calculateVolumeConfirmation(
+  marketConditions: MarketConditions,
+  signalType: "BUY" | "SELL"
 ): number {
-  let score = 50; // Base score
-  
-  // Ideal volatility for trading
-  switch (multiTimeframeAnalysis.volatilityState) {
-    case "NORMAL":
-      score = 90; // Perfect for trading
-      break;
-    case "LOW":
-      score = 70; // Acceptable but lower profit potential
-      break;
-    case "HIGH":
-      score = 60; // Risky but tradeable
-      break;
-    case "EXTREME":
-      score = 20; // Very risky
-      break;
+  // High volume confirms the signal
+  switch (marketConditions.volume) {
+    case "HIGH": return 0.9;
+    case "MEDIUM": return 0.6;
+    case "LOW": return 0.3;
+    default: return 0.5;
   }
-  
-  return score;
 }
 
-/**
- * Calculate weighted confidence score
- */
-function calculateWeightedConfidence(factors: ConfidenceFactors): number {
+function calculateTrendStrength(
+  indicators: TechnicalIndicators,
+  marketConditions: MarketConditions
+): number {
+  let strength = 0;
+  
+  // SMA relationship
+  const smaRatio = indicators.sma20 / indicators.sma50;
+  if (smaRatio > 1.02 || smaRatio < 0.98) strength += 0.3;
+  else strength += 0.1;
+  
+  // MACD histogram strength
+  const macdStrength = Math.abs(indicators.macdHistogram);
+  if (macdStrength > 0.5) strength += 0.3;
+  else if (macdStrength > 0.2) strength += 0.2;
+  else strength += 0.1;
+  
+  // Volatility consideration
+  if (marketConditions.volatility > 0.03) strength += 0.4; // High volatility can indicate strong trends
+  else strength += 0.2;
+  
+  return Math.min(strength, 1);
+}
+
+function calculateRiskReward(
+  marketData: MarketData[],
+  marketConditions: MarketConditions,
+  signalType: "BUY" | "SELL"
+): number {
+  const currentPrice = marketData[marketData.length - 1].close;
+  
+  let targetPrice: number;
+  let stopLoss: number;
+  
+  if (signalType === "BUY") {
+    targetPrice = marketConditions.resistance;
+    stopLoss = marketConditions.support;
+  } else {
+    targetPrice = marketConditions.support;
+    stopLoss = marketConditions.resistance;
+  }
+  
+  const potentialGain = Math.abs(targetPrice - currentPrice);
+  const potentialLoss = Math.abs(stopLoss - currentPrice);
+  
+  if (potentialLoss === 0) return 0.5;
+  
+  const riskRewardRatio = potentialGain / potentialLoss;
+  
+  // Convert ratio to score (higher ratio = higher score)
+  if (riskRewardRatio >= 3) return 1;
+  if (riskRewardRatio >= 2) return 0.8;
+  if (riskRewardRatio >= 1.5) return 0.6;
+  if (riskRewardRatio >= 1) return 0.4;
+  return 0.2;
+}
+
+function applyDynamicThresholds(
+  factors: ConfidenceFactors,
+  marketConditions: MarketConditions
+): ConfidenceFactors {
+  const adjustmentFactor = calculateAdjustmentFactor(marketConditions);
+  
+  return {
+    technicalAlignment: factors.technicalAlignment * adjustmentFactor.technical,
+    marketConditions: factors.marketConditions * adjustmentFactor.market,
+    volumeConfirmation: factors.volumeConfirmation * adjustmentFactor.volume,
+    trendStrength: factors.trendStrength * adjustmentFactor.trend,
+    riskReward: factors.riskReward * adjustmentFactor.risk,
+    historicalAccuracy: factors.historicalAccuracy * adjustmentFactor.historical
+  };
+}
+
+function calculateAdjustmentFactor(marketConditions: MarketConditions) {
+  let technical = 1;
+  let market = 1;
+  let volume = 1;
+  let trend = 1;
+  let risk = 1;
+  let historical = 1;
+  
+  // Adjust based on volatility
+  if (marketConditions.volatility > 0.05) {
+    technical *= 0.9; // Reduce technical confidence in high volatility
+    risk *= 0.8; // Increase risk penalty
+  } else if (marketConditions.volatility < 0.02) {
+    technical *= 1.1; // Increase technical confidence in low volatility
+    risk *= 1.2; // Reduce risk penalty
+  }
+  
+  // Adjust based on trend
+  if (marketConditions.trend === "SIDEWAYS") {
+    trend *= 0.8; // Reduce trend confidence in sideways market
+    market *= 0.9;
+  }
+  
+  // Adjust based on volume
+  if (marketConditions.volume === "LOW") {
+    volume *= 0.7; // Reduce volume confidence
+    market *= 0.9;
+  }
+  
+  return { technical, market, volume, trend, risk, historical };
+}
+
+function calculateWeightedConfidence(
+  baseConfidence: number,
+  factors: ConfidenceFactors
+): number {
   const weights = {
-    technicalAlignment: 0.10,        // Reduced for ML factors
-    multiTimeframeConfluence: 0.08,  // Reduced
-    volumeConfirmation: 0.05,        // Reduced
-    marketConditions: 0.08,          // Reduced
-    historicalPerformance: 0.06,     // Reduced
-    riskAdjustment: 0.06,            // Reduced
-    momentumStrength: 0.03,          // Reduced
-    volatilityFilter: 0.04,          // Reduced
-    // Institutional factors (20% total weight)
-    institutionalAlignment: 0.08,    // Reduced for ML
-    orderBlockConfirmation: 0.06,    // Reduced
-    liquidityZoneConfirmation: 0.06, // Reduced
-    marketMakerConfidence: 0.03,     // Reduced
-    // NEW: ML factors (30% total weight)
-    mlModelConfidence: 0.12,         // High weight for ML predictions
-    featureImportanceScore: 0.06,    // Feature significance
-    patternRecognitionScore: 0.05,   // Real pattern detection
-    statisticalSignificance: 0.04,   // Statistical validation
-    crossValidationScore: 0.05,      // Model generalization
-    anomalyDetectionScore: 0.03      // Anomaly detection
+    technicalAlignment: 0.25,
+    marketConditions: 0.20,
+    volumeConfirmation: 0.15,
+    trendStrength: 0.15,
+    riskReward: 0.15,
+    historicalAccuracy: 0.10
   };
-
-  let weightedScore = 0;
-  let totalWeight = 0;
-
-  Object.entries(factors).forEach(([factor, score]) => {
-    const weight = weights[factor as keyof typeof weights] || 0;
-    weightedScore += score * weight;
-    totalWeight += weight;
-  });
-
-  return weightedScore / totalWeight;
+  
+  const weightedScore = 
+    factors.technicalAlignment * weights.technicalAlignment +
+    factors.marketConditions * weights.marketConditions +
+    factors.volumeConfirmation * weights.volumeConfirmation +
+    factors.trendStrength * weights.trendStrength +
+    factors.riskReward * weights.riskReward +
+    factors.historicalAccuracy * weights.historicalAccuracy;
+  
+  // Combine base confidence with enhanced factors
+  const enhancedConfidence = (baseConfidence * 0.4) + (weightedScore * 0.6);
+  
+  return Math.max(0, Math.min(1, enhancedConfidence));
 }
 
-/**
- * Apply dynamic thresholds based on market conditions
- */
-function applyDynamicThresholds(
-  baseConfidence: number,
-  marketContext: MarketConditionContext,
-  multiTimeframeAnalysis: MultiTimeframeAnalysis
-): number {
-  let adjustedConfidence = baseConfidence;
-
-  // Apply volatility adjustment
-  adjustedConfidence *= marketContext.volatilityAdjustment;
-
-  // Reduce confidence during extreme volatility
-  if (multiTimeframeAnalysis.volatilityState === "EXTREME") {
-    adjustedConfidence *= 0.7;
-  }
-
-  // Boost confidence during strong trends
-  if (multiTimeframeAnalysis.trendAlignment === "STRONG_BULL" || 
-      multiTimeframeAnalysis.trendAlignment === "STRONG_BEAR") {
-    adjustedConfidence *= 1.1;
-  }
-
-  // Ensure confidence stays within reasonable bounds
-  return Math.min(98, Math.max(15, adjustedConfidence));
-}
-
-/**
- * Get confidence grade based on score
- */
-function getConfidenceGrade(confidence: number): EnhancedConfidenceResult["confidenceGrade"] {
-  if (confidence >= 90) return "A+";
-  if (confidence >= 85) return "A";
-  if (confidence >= 80) return "B+";
-  if (confidence >= 75) return "B";
-  if (confidence >= 60) return "C";
-  if (confidence >= 45) return "D";
-  return "F";
-}
-
-/**
- * Generate warnings based on analysis
- */
-function generateWarnings(
-  factors: ConfidenceFactors,
-  marketContext: MarketConditionContext,
-  multiTimeframeAnalysis: MultiTimeframeAnalysis
-): string[] {
-  const warnings: string[] = [];
-
-  if (factors.technicalAlignment < 50) {
-    warnings.push("⚠️ Weak technical alignment across indicators");
-  }
-
-  if (factors.multiTimeframeConfluence < 40) {
-    warnings.push("⚠️ Poor multi-timeframe confluence - signals conflicting");
-  }
-
-  if (marketContext.sessionType === "DEAD") {
-    warnings.push("⚠️ Trading during low-activity session - reduced liquidity");
-  }
-
-  if (multiTimeframeAnalysis.volatilityState === "EXTREME") {
-    warnings.push("🚨 Extreme market volatility detected - high risk");
-  }
-
-  if (factors.volumeConfirmation < 30) {
-    warnings.push("⚠️ Weak volume confirmation for price movement");
-  }
-
-  if (factors.historicalPerformance < 40) {
-    warnings.push("⚠️ Poor historical performance for this symbol/conditions");
-  }
-
-  if (factors.riskAdjustment < 40) {
-    warnings.push("🚨 High-risk market conditions - consider reducing position size");
-  }
-
-  // NEW: Institutional warnings
-  if (factors.institutionalAlignment < 40) {
-    warnings.push("⚠️ Institutional flow conflicts with trade direction");
-  }
-
-  if (factors.orderBlockConfirmation < 30) {
-    warnings.push("⚠️ No supporting order blocks found for this direction");
-  }
-
-  if (factors.liquidityZoneConfirmation < 30) {
-    warnings.push("⚠️ Price not near significant supply/demand zones");
-  }
-
-  return warnings;
-}
-
-/**
- * Calculate institutional alignment score
- */
-function calculateInstitutionalAlignment(
-  institutionalAnalysis: InstitutionalAnalysis | undefined,
-  direction: "LONG" | "SHORT"
-): number {
-  if (!institutionalAnalysis) return 50; // Neutral if no analysis
-
-  let score = 50; // Base score
-  
-  // Smart money direction alignment
-  const { smartMoneyDirection } = institutionalAnalysis.marketMakerModel;
-  if ((direction === "LONG" && smartMoneyDirection === "LONG") ||
-      (direction === "SHORT" && smartMoneyDirection === "SHORT")) {
-    score += 20;
-  } else if (smartMoneyDirection === "SIDEWAYS") {
-    score -= 10;
-  } else {
-    score -= 25; // Conflicting direction
-  }
-  
-  // Institutional flow alignment
-  const { institutionalFlow } = institutionalAnalysis.marketMakerModel;
-  if ((direction === "LONG" && institutionalFlow === "BUYING") ||
-      (direction === "SHORT" && institutionalFlow === "SELLING")) {
-    score += 15;
-  } else if (institutionalFlow === "NEUTRAL") {
-    score -= 5;
-  } else {
-    score -= 20; // Conflicting flow
-  }
-  
-  // Active session boost
-  const hasHighVolatilitySession = institutionalAnalysis.activeSessions.some(
-    session => session.volatilityMultiplier >= 1.2
-  );
-  if (hasHighVolatilitySession) {
-    score += 10;
-  }
-  
-  // Kill zone alignment
-  const activeKillZone = institutionalAnalysis.killZones.find(kz => kz.isActive);
-  if (activeKillZone && activeKillZone.volatilityExpected === "HIGH") {
-    score += 10;
-  }
-  
-  return Math.min(100, Math.max(0, score));
-}
-
-/**
- * Calculate order block confirmation score
- */
-function calculateOrderBlockConfirmation(
-  institutionalAnalysis: InstitutionalAnalysis | undefined,
-  direction: "LONG" | "SHORT"
-): number {
-  if (!institutionalAnalysis) return 30; // Low if no analysis
-  
-  const { orderBlocks } = institutionalAnalysis;
-  
-  if (orderBlocks.length === 0) return 20;
-  
-  // Filter order blocks by direction
-  const relevantOBs = orderBlocks.filter(ob => 
-    (direction === "LONG" && ob.type === "BULLISH") ||
-    (direction === "SHORT" && ob.type === "BEARISH")
-  );
-  
-  if (relevantOBs.length === 0) return 25;
-  
-  let score = 40; // Base score for having relevant OBs
-  
-  // Boost score based on order block strength
-  const strengthBonus = relevantOBs.reduce((sum, ob) => {
-    const strengthScore = { "EXTREME": 20, "STRONG": 15, "MODERATE": 10, "WEAK": 5 };
-    return sum + strengthScore[ob.strength];
-  }, 0);
-  
-  score += Math.min(40, strengthBonus);
-  
-  // Boost score for fresh order blocks
-  const freshOBs = relevantOBs.filter(ob => ob.status === "FRESH");
-  score += freshOBs.length * 5;
-  
-  // Boost score for nearby order blocks
-  const nearbyOBs = relevantOBs.filter(ob => ob.distance < 0.02); // Within 2%
-  score += nearbyOBs.length * 10;
-  
-  return Math.min(100, Math.max(0, score));
-}
-
-/**
- * Calculate liquidity zone confirmation score
- */
-function calculateLiquidityZoneConfirmation(
-  institutionalAnalysis: InstitutionalAnalysis | undefined,
-  direction: "LONG" | "SHORT"
-): number {
-  if (!institutionalAnalysis) return 30; // Low if no analysis
-  
-  const { supplyDemandZones } = institutionalAnalysis;
-  
-  if (supplyDemandZones.length === 0) return 25;
-  
-  // Filter zones by direction
-  const relevantZones = supplyDemandZones.filter(zone => 
-    (direction === "LONG" && zone.type === "DEMAND") ||
-    (direction === "SHORT" && zone.type === "SUPPLY")
-  );
-  
-  if (relevantZones.length === 0) return 30;
-  
-  let score = 45; // Base score for having relevant zones
-  
-  // Boost score based on zone strength
-  const strengthBonus = relevantZones.reduce((sum, zone) => {
-    const strengthScore = { "EXTREME": 20, "STRONG": 15, "MODERATE": 10, "WEAK": 5 };
-    return sum + strengthScore[zone.strength];
-  }, 0);
-  
-  score += Math.min(35, strengthBonus);
-  
-  // Boost score for fresh zones
-  const freshZones = relevantZones.filter(zone => zone.status === "FRESH");
-  score += freshZones.length * 8;
-  
-  // Boost score for untested zones
-  const untestedZones = relevantZones.filter(zone => zone.touches === 0);
-  score += untestedZones.length * 10;
-  
-  return Math.min(100, Math.max(0, score));
-}
-
-/**
- * Calculate market maker confidence score
- */
-function calculateMarketMakerConfidence(
-  institutionalAnalysis: InstitutionalAnalysis | undefined
-): number {
-  if (!institutionalAnalysis) return 40; // Neutral if no analysis
-  
-  const { marketMakerModel } = institutionalAnalysis;
-  
-  let score = marketMakerModel.confidence; // Base score from MM model
-  
-  // Boost score based on phase clarity
-  switch (marketMakerModel.phase) {
-    case "ACCUMULATION":
-    case "DISTRIBUTION":
-      score += 10; // Clear phases are good
-      break;
-    case "MANIPULATION":
-      score += 15; // Manipulation phase often leads to strong moves
-      break;
-    case "REACCUMULATION":
-      score += 5; // Moderate boost
-      break;
-  }
-  
-  // Adjust based on liquidity sweep probability
-  if (marketMakerModel.liquiditySweepProbability > 70) {
-    score -= 10; // High probability of false moves
-  } else if (marketMakerModel.liquiditySweepProbability < 30) {
-    score += 10; // Low probability of manipulation
-  }
-  
-  return Math.min(100, Math.max(0, score));
-}
-
-/**
- * Calculate overall institutional score
- */
-function calculateInstitutionalScore(factors: ConfidenceFactors): number {
-  const institutionalFactors = [
-    factors.institutionalAlignment,
-    factors.orderBlockConfirmation,
-    factors.liquidityZoneConfirmation,
-    factors.marketMakerConfidence
-  ];
-  
-  return institutionalFactors.reduce((sum, score) => sum + score, 0) / institutionalFactors.length;
-}
-
-/**
- * Updated recommendations with institutional bias
- */
 function generateRecommendations(
-  confidence: number,
   factors: ConfidenceFactors,
-  marketContext: MarketConditionContext,
-  institutionalAnalysis?: InstitutionalAnalysis
-): EnhancedConfidenceResult["recommendations"] {
-  // Determine if trade should be taken
-  const shouldTrade = confidence >= 65 && 
-                     factors.technicalAlignment >= 50 && 
-                     factors.institutionalAlignment >= 40; // NEW: institutional requirement
-  
-  // Adjust lot size with institutional factors
-  let suggestedLotSizeMultiplier = 1.0;
-  
-  const institutionalScore = calculateInstitutionalScore(factors);
-  
-  if (confidence >= 85 && institutionalScore >= 80) suggestedLotSizeMultiplier = 2.0; // Max size
-  else if (confidence >= 75 && institutionalScore >= 70) suggestedLotSizeMultiplier = 1.5;
-  else if (confidence >= 65 && institutionalScore >= 60) suggestedLotSizeMultiplier = 1.2;
-  else if (confidence >= 55 && institutionalScore >= 50) suggestedLotSizeMultiplier = 1.0;
-  else if (confidence >= 45 && institutionalScore >= 40) suggestedLotSizeMultiplier = 0.5;
-  else suggestedLotSizeMultiplier = 0.1;
-  
-  // Risk adjustment with institutional considerations
-  let riskAdjustment: EnhancedConfidenceResult["recommendations"]["riskAdjustment"];
-  if (factors.riskAdjustment >= 80 && institutionalScore >= 70) riskAdjustment = "INCREASE";
-  else if (factors.riskAdjustment >= 60 && institutionalScore >= 50) riskAdjustment = "NORMAL";
-  else riskAdjustment = "REDUCE";
-  
-  // Timeframe recommendation with institutional timing
-  let timeframeRecommendation: EnhancedConfidenceResult["recommendations"]["timeframeRecommendation"];
-  const hasActiveKillZone = institutionalAnalysis?.killZones.some(kz => kz.isActive) || false;
-  
-  if (factors.momentumStrength >= 80 && hasActiveKillZone) {
-    timeframeRecommendation = "SHORT_TERM";
-  } else if (factors.multiTimeframeConfluence >= 75 && institutionalScore >= 60) {
-    timeframeRecommendation = "MEDIUM_TERM";
-  } else {
-    timeframeRecommendation = "LONG_TERM";
-  }
-  
-  // NEW: Institutional bias
-  let institutionalBias: EnhancedConfidenceResult["recommendations"]["institutionalBias"];
-  if (institutionalScore >= 85) {
-    institutionalBias = institutionalAnalysis?.marketMakerModel.smartMoneyDirection === "LONG" 
-      ? "STRONG_BULLISH" : "STRONG_BEARISH";
-  } else if (institutionalScore >= 70) {
-    institutionalBias = institutionalAnalysis?.marketMakerModel.smartMoneyDirection === "LONG" 
-      ? "BULLISH" : "BEARISH";
-  } else if (institutionalScore >= 30) {
-    institutionalBias = "NEUTRAL";
-  } else {
-    institutionalBias = institutionalAnalysis?.marketMakerModel.smartMoneyDirection === "LONG" 
-      ? "BEARISH" : "BULLISH"; // Contrarian when institutional score is very low
-  }
-
-  return {
-    shouldTrade,
-    suggestedLotSizeMultiplier,
-    riskAdjustment,
-    timeframeRecommendation,
-    institutionalBias
-  };
-}
-
-/**
- * Get ML prediction confidence using trained models
- */
-async function getMlPredictionConfidence(
-  indicators5m: EnhancedIndicators,
-  indicators15m: EnhancedIndicators,
-  indicators30m: EnhancedIndicators,
-  symbol: string,
-  advancedFeatures?: AdvancedFeatures | null
-): Promise<{
-  confidence: number;
-  prediction: number;
-  crossValidationScore: number;
-  featureImportance: number[];
-}> {
-  try {
-    // Create feature vector for ML prediction
-    const features = [
-      indicators5m.rsi || 50,
-      indicators15m.rsi || 50,
-      indicators30m.rsi || 50,
-      indicators5m.macd?.line || 0,
-      indicators5m.macd?.signal || 0,
-      indicators5m.macd?.histogram || 0,
-      indicators5m.momentum?.roc || 0,
-      indicators15m.momentum?.roc || 0,
-      indicators5m.sma?.sma20 || 0,
-      indicators5m.sma?.sma50 || 0,
-    ];
-    
-    // Add advanced features if available
-    if (advancedFeatures) {
-      features.push(
-        advancedFeatures.priceFeatures.volatility,
-        advancedFeatures.priceFeatures.skewness,
-        advancedFeatures.priceFeatures.hurst_exponent,
-        advancedFeatures.technicalFeatures.rsi_divergence,
-        advancedFeatures.volumeFeatures.price_volume_correlation,
-        advancedFeatures.microstructureFeatures.regime_change_probability
-      );
-    }
-    
-    const featureNames = [
-      'rsi_5m', 'rsi_15m', 'rsi_30m',
-      'macd_line', 'macd_signal', 'macd_histogram',
-      'momentum_5m', 'momentum_15m',
-      'sma_20', 'sma_50',
-      'volatility', 'skewness', 'hurst_exp', 'rsi_div', 'pv_corr', 'regime_prob'
-    ];
-    
-    // Get ML prediction
-    const mlPrediction = await learningEngine.predictWithModels(features, featureNames);
-    
-    return {
-      confidence: mlPrediction.confidence,
-      prediction: mlPrediction.ensemblePrediction,
-      crossValidationScore: Math.max(0.5, mlPrediction.confidence * 0.9), // Simplified CV score
-      featureImportance: features.map((_, idx) => Math.random() * 0.2 + 0.05) // Placeholder
-    };
-    
-  } catch (error) {
-    console.error('Error getting ML prediction:', error);
-    return {
-      confidence: 0.5,
-      prediction: 0.5,
-      crossValidationScore: 0.5,
-      featureImportance: []
-    };
-  }
-}
-
-/**
- * Calculate feature importance score
- */
-function calculateFeatureImportanceScore(advancedFeatures?: AdvancedFeatures | null): number {
-  if (!advancedFeatures) return 50;
-  
-  try {
-    const features = advancedFeatures;
-    let score = 50;
-    
-    // High volatility reduces feature reliability
-    if (features.priceFeatures.volatility > 0.3) score -= 15;
-    else if (features.priceFeatures.volatility < 0.1) score += 10;
-    
-    // Strong trends increase feature importance
-    if (Math.abs(features.priceFeatures.skewness) > 1) score += 10;
-    
-    // Volume-price correlation adds reliability
-    if (Math.abs(features.volumeFeatures.price_volume_correlation) > 0.7) score += 15;
-    
-    // Market regime stability
-    if (features.microstructureFeatures.regime_change_probability < 0.3) score += 10;
-    else if (features.microstructureFeatures.regime_change_probability > 0.7) score -= 20;
-    
-    return Math.max(0, Math.min(100, score));
-    
-  } catch (error) {
-    return 50;
-  }
-}
-
-/**
- * Calculate pattern recognition score using real patterns
- */
-async function calculatePatternRecognitionScore(marketData?: any, symbol?: string): Promise<number> {
-  if (!marketData || !symbol) return 50;
-  
-  try {
-    // This would use the real pattern detection from learning engine
-    await learningEngine.detectMarketPatterns(symbol, marketData);
-    
-    // For now, return a baseline score
-    // In practice, this would analyze detected patterns and their reliability
-    return 65;
-    
-  } catch (error) {
-    console.error('Error calculating pattern recognition score:', error);
-    return 50;
-  }
-}
-
-/**
- * Calculate statistical significance
- */
-function calculateStatisticalSignificance(
-  indicators5m: EnhancedIndicators,
-  indicators15m: EnhancedIndicators,
-  indicators30m: EnhancedIndicators
-): number {
-  try {
-    // Check for statistical significance of indicators
-    const rsiValues = [indicators5m.rsi, indicators15m.rsi, indicators30m.rsi].filter(v => v !== undefined);
-    
-    if (rsiValues.length < 2) return 50;
-    
-    const rsiMean = ss.mean(rsiValues as number[]);
-    const rsiStd = ss.standardDeviation(rsiValues as number[]);
-    
-    // Strong signals (extreme RSI) have higher statistical significance
-    let score = 50;
-    
-    if (rsiMean < 30 || rsiMean > 70) {
-      score += 20; // Extreme values are statistically significant
-    }
-    
-    // Low standard deviation means consistent signals
-    if (rsiStd < 5) {
-      score += 15;
-    }
-    
-    // Check MACD consistency
-    const macdValues = [
-      indicators5m.macd?.histogram,
-      indicators15m.macd?.histogram,
-      indicators30m.macd?.histogram
-    ].filter(v => v !== undefined);
-    
-    if (macdValues.length > 1) {
-      const allSameSign = macdValues.every(v => Math.sign(v as number) === Math.sign(macdValues[0] as number));
-      if (allSameSign) score += 10;
-    }
-    
-    return Math.max(0, Math.min(100, score));
-    
-  } catch (error) {
-    return 50;
-  }
-}
-
-/**
- * Calculate anomaly detection score
- */
-function calculateAnomalyDetectionScore(advancedFeatures?: AdvancedFeatures | null): number {
-  if (!advancedFeatures) return 50;
-  
-  try {
-    let score = 50;
-    
-    // Check for statistical outliers
-    if (advancedFeatures.priceFeatures.kurtosis > 3) {
-      score -= 20; // High kurtosis indicates outliers
-    }
-    
-    // Jump detection
-    if (advancedFeatures.microstructureFeatures.jump_detection) {
-      score -= 30; // Price jumps are anomalous
-    }
-    
-    // High volatility is anomalous
-    if (advancedFeatures.priceFeatures.volatility > 0.5) {
-      score -= 15;
-    }
-    
-    // Normal market conditions get higher scores
-    if (advancedFeatures.microstructureFeatures.regime_change_probability < 0.2) {
-      score += 20;
-    }
-    
-    return Math.max(0, Math.min(100, score));
-    
-  } catch (error) {
-    return 50;
-  }
-}
-
-/**
- * Calculate ML score separately
- */
-function calculateMlScore(factors: ConfidenceFactors): number {
-  const mlFactors = [
-    factors.mlModelConfidence,
-    factors.featureImportanceScore,
-    factors.patternRecognitionScore,
-    factors.statisticalSignificance,
-    factors.crossValidationScore,
-    factors.anomalyDetectionScore
-  ];
-  
-  return mlFactors.reduce((sum, score) => sum + score, 0) / mlFactors.length;
-}
-
-/**
- * Calculate statistical validation metrics
- */
-function calculateStatisticalValidation(
-  factors: ConfidenceFactors,
-  indicators5m: EnhancedIndicators,
-  indicators15m: EnhancedIndicators,
-  indicators30m: EnhancedIndicators
-): EnhancedConfidenceResult['statisticalValidation'] {
-  try {
-    // Simplified statistical validation
-    const confidence = factors.mlModelConfidence / 100;
-    const sampleSize = 3; // Number of timeframes
-    
-    // Simple p-value estimation (normally requires historical data)
-    const pValue = Math.max(0.001, 1 - confidence);
-    
-    // Confidence interval (simplified)
-    const margin = 1.96 * Math.sqrt(confidence * (1 - confidence) / sampleSize);
-    const confidenceInterval: [number, number] = [
-      Math.max(0, confidence - margin),
-      Math.min(1, confidence + margin)
-    ];
-    
-    // Effect size (Cohen's d approximation)
-    const effectSize = Math.abs(confidence - 0.5) / 0.25; // Standardized effect
-    
-    return {
-      pValue,
-      confidenceInterval,
-      sampleSize,
-      effectSize
-    };
-    
-  } catch (error) {
-    return {
-      pValue: 0.5,
-      confidenceInterval: [0.3, 0.7],
-      sampleSize: 3,
-      effectSize: 0
-    };
-  }
-}
-
-/**
- * Apply dynamic thresholds with ML insights
- */
-function applyDynamicThresholds(
-  baseConfidence: number,
-  marketContext: MarketConditionContext,
-  multiTimeframeAnalysis: MultiTimeframeAnalysis,
-  mlPrediction?: any
-): number {
-  let adjustedConfidence = baseConfidence;
-
-  // Apply volatility adjustment
-  adjustedConfidence *= marketContext.volatilityAdjustment;
-
-  // Reduce confidence during extreme volatility
-  if (multiTimeframeAnalysis.volatilityState === "EXTREME") {
-    adjustedConfidence *= 0.6; // More severe penalty
-  }
-
-  // Boost confidence during strong trends with ML confirmation
-  if (multiTimeframeAnalysis.trendAlignment === "STRONG_BULL" || 
-      multiTimeframeAnalysis.trendAlignment === "STRONG_BEAR") {
-    if (mlPrediction && mlPrediction.confidence > 0.8) {
-      adjustedConfidence *= 1.15; // ML-confirmed strong trends
-    } else {
-      adjustedConfidence *= 1.1;
-    }
-  }
-
-  // ML prediction adjustment
-  if (mlPrediction) {
-    if (mlPrediction.confidence > 0.85) {
-      adjustedConfidence *= 1.1; // High ML confidence
-    } else if (mlPrediction.confidence < 0.55) {
-      adjustedConfidence *= 0.85; // Low ML confidence
-    }
-  }
-
-  // Ensure confidence stays within reasonable bounds
-  return Math.min(98, Math.max(15, adjustedConfidence));
-}
-
-/**
- * Generate enhanced recommendations with ML insights
- */
-function generateEnhancedRecommendations(
-  confidence: number,
-  factors: ConfidenceFactors,
-  marketContext: MarketConditionContext,
-  institutionalAnalysis?: InstitutionalAnalysis,
-  mlPrediction?: any
-): EnhancedConfidenceResult["recommendations"] {
-  // Determine if trade should be taken with ML validation
-  const shouldTrade = confidence >= 65 && 
-                     factors.technicalAlignment >= 50 && 
-                     factors.institutionalAlignment >= 40 &&
-                     factors.mlModelConfidence >= 55; // NEW: ML threshold
-  
-  // Adjust lot size with ML confidence
-  let suggestedLotSizeMultiplier = 1.0;
-  
-  const institutionalScore = calculateInstitutionalScore(factors);
-  const mlScore = calculateMlScore(factors);
-  
-  // Enhanced lot sizing with ML
-  if (confidence >= 85 && institutionalScore >= 80 && mlScore >= 75) suggestedLotSizeMultiplier = 2.0;
-  else if (confidence >= 75 && institutionalScore >= 70 && mlScore >= 65) suggestedLotSizeMultiplier = 1.5;
-  else if (confidence >= 65 && institutionalScore >= 60 && mlScore >= 55) suggestedLotSizeMultiplier = 1.2;
-  else if (confidence >= 55 && mlScore >= 50) suggestedLotSizeMultiplier = 1.0;
-  else if (confidence >= 45 && mlScore >= 40) suggestedLotSizeMultiplier = 0.5;
-  else suggestedLotSizeMultiplier = 0.1;
-  
-  // Risk adjustment with ML insights
-  let riskAdjustment: EnhancedConfidenceResult["recommendations"]["riskAdjustment"];
-  if (factors.riskAdjustment >= 80 && institutionalScore >= 70 && mlScore >= 70) riskAdjustment = "INCREASE";
-  else if (factors.riskAdjustment >= 60 && mlScore >= 55) riskAdjustment = "NORMAL";
-  else riskAdjustment = "REDUCE";
-  
-  // Timeframe recommendation
-  let timeframeRecommendation: EnhancedConfidenceResult["recommendations"]["timeframeRecommendation"];
-  const hasActiveKillZone = institutionalAnalysis?.killZones.some(kz => kz.isActive) || false;
-  
-  if (factors.momentumStrength >= 80 && hasActiveKillZone && mlScore >= 70) {
-    timeframeRecommendation = "SHORT_TERM";
-  } else if (factors.multiTimeframeConfluence >= 75 && mlScore >= 60) {
-    timeframeRecommendation = "MEDIUM_TERM";
-  } else {
-    timeframeRecommendation = "LONG_TERM";
-  }
-  
-  // Institutional bias
-  let institutionalBias: EnhancedConfidenceResult["recommendations"]["institutionalBias"];
-  if (institutionalScore >= 85) {
-    institutionalBias = institutionalAnalysis?.marketMakerModel.smartMoneyDirection === "LONG" 
-      ? "STRONG_BULLISH" : "STRONG_BEARISH";
-  } else if (institutionalScore >= 70) {
-    institutionalBias = institutionalAnalysis?.marketMakerModel.smartMoneyDirection === "LONG" 
-      ? "BULLISH" : "BEARISH";
-  } else if (institutionalScore >= 30) {
-    institutionalBias = "NEUTRAL";
-  } else {
-    institutionalBias = institutionalAnalysis?.marketMakerModel.smartMoneyDirection === "LONG" 
-      ? "BEARISH" : "BULLISH";
-  }
-
-  // NEW: ML recommendation
-  let mlRecommendation: EnhancedConfidenceResult["recommendations"]["mlRecommendation"];
-  if (mlScore >= 80) mlRecommendation = "HIGH_CONFIDENCE";
-  else if (mlScore >= 65) mlRecommendation = "MODERATE_CONFIDENCE";
-  else if (mlScore >= 50) mlRecommendation = "LOW_CONFIDENCE";
-  else mlRecommendation = "AVOID";
-
-  return {
-    shouldTrade,
-    suggestedLotSizeMultiplier,
-    riskAdjustment,
-    timeframeRecommendation,
-    institutionalBias,
-    mlRecommendation
-  };
-}
-
-/**
- * Generate enhanced warnings with ML insights
- */
-function generateEnhancedWarnings(
-  factors: ConfidenceFactors,
-  marketContext: MarketConditionContext,
-  multiTimeframeAnalysis: MultiTimeframeAnalysis,
-  mlPrediction?: any,
-  advancedFeatures?: AdvancedFeatures | null
+  marketConditions: MarketConditions,
+  signalType: "BUY" | "SELL"
 ): string[] {
-  const warnings: string[] = [];
-
-  // Existing warnings
-  if (factors.technicalAlignment < 50) {
-    warnings.push("⚠️ Weak technical alignment across indicators");
+  const recommendations: string[] = [];
+  
+  if (factors.technicalAlignment < 0.6) {
+    recommendations.push("Technical indicators show mixed signals - consider waiting for better alignment");
   }
-
-  if (factors.multiTimeframeConfluence < 40) {
-    warnings.push("⚠️ Poor multi-timeframe confluence - signals conflicting");
+  
+  if (factors.volumeConfirmation < 0.5) {
+    recommendations.push("Low volume confirmation - signal may lack conviction");
   }
-
-  if (marketContext.sessionType === "DEAD") {
-    warnings.push("⚠️ Trading during low-activity session - reduced liquidity");
+  
+  if (marketConditions.volatility > 0.05) {
+    recommendations.push("High market volatility detected - consider reducing position size");
   }
-
-  if (multiTimeframeAnalysis.volatilityState === "EXTREME") {
-    warnings.push("🚨 Extreme market volatility detected - high risk");
+  
+  if (factors.riskReward < 0.5) {
+    recommendations.push("Poor risk/reward ratio - consider adjusting stop loss and take profit levels");
   }
-
-  // ML-specific warnings
-  if (factors.mlModelConfidence < 55) {
-    warnings.push("🤖 ML model confidence is low - consider waiting");
+  
+  if (marketConditions.trend === "SIDEWAYS") {
+    recommendations.push("Market is in sideways trend - consider range trading strategies");
   }
-
-  if (factors.statisticalSignificance < 40) {
-    warnings.push("📊 Statistical significance is low - signals may be noise");
+  
+  if (factors.trendStrength > 0.8) {
+    recommendations.push("Strong trend detected - consider trend-following strategies");
   }
+  
+  return recommendations;
+}
 
-  if (factors.anomalyDetectionScore < 30) {
-    warnings.push("🚨 Market anomaly detected - unusual conditions");
+function determineRiskLevel(
+  enhancedConfidence: number,
+  marketConditions: MarketConditions
+): "LOW" | "MEDIUM" | "HIGH" {
+  let riskScore = 0;
+  
+  // Confidence level
+  if (enhancedConfidence < 0.5) riskScore += 2;
+  else if (enhancedConfidence < 0.7) riskScore += 1;
+  
+  // Volatility
+  if (marketConditions.volatility > 0.05) riskScore += 2;
+  else if (marketConditions.volatility > 0.03) riskScore += 1;
+  
+  // Volume
+  if (marketConditions.volume === "LOW") riskScore += 1;
+  
+  // Trend
+  if (marketConditions.trend === "SIDEWAYS") riskScore += 1;
+  
+  if (riskScore >= 4) return "HIGH";
+  if (riskScore >= 2) return "MEDIUM";
+  return "LOW";
+}
+
+// API endpoint for enhanced confidence calculation
+export const getEnhancedConfidence = api<EnhancedConfidenceRequest, EnhancedConfidenceResponse>(
+  { expose: true, method: "POST", path: "/analysis/enhanced-confidence" },
+  async (req) => {
+    const { symbol, timeframe, signalType, baseConfidence } = req;
+    
+    // Get market data (simplified - would fetch from data provider)
+    const marketData = await getMarketData(symbol, timeframe);
+    
+    // Calculate technical indicators
+    const indicators = await calculateTechnicalIndicators(marketData);
+    
+    // Calculate enhanced confidence
+    const result = await calculateEnhancedConfidence(
+      symbol,
+      marketData,
+      indicators,
+      signalType,
+      baseConfidence
+    );
+    
+    return result;
   }
+);
 
-  if (factors.crossValidationScore < 50) {
-    warnings.push("🔄 Model generalization concerns - may not perform as expected");
+async function getMarketData(symbol: string, timeframe: string): Promise<MarketData[]> {
+  // Mock data - in real implementation, fetch from market data provider
+  const mockData: MarketData[] = [];
+  const basePrice = 100;
+  
+  for (let i = 0; i < 100; i++) {
+    const price = basePrice + Math.random() * 20 - 10;
+    mockData.push({
+      timestamp: new Date(Date.now() - (100 - i) * 60000),
+      open: price,
+      high: price * 1.02,
+      low: price * 0.98,
+      close: price,
+      volume: Math.floor(Math.random() * 1000000)
+    });
   }
+  
+  return mockData;
+}
 
-  // Advanced feature warnings
-  if (advancedFeatures) {
-    if (advancedFeatures.microstructureFeatures.jump_detection) {
-      warnings.push("⚡ Price jump detected - high volatility expected");
+async function calculateTechnicalIndicators(marketData: MarketData[]): Promise<TechnicalIndicators> {
+  const closes = marketData.map(d => d.close);
+  const highs = marketData.map(d => d.high);
+  const lows = marketData.map(d => d.low);
+  
+  // Calculate various technical indicators
+  const sma20 = calculateSMA(closes, 20);
+  const sma50 = calculateSMA(closes, 50);
+  const rsi = calculateRSI(closes, 14);
+  const macd = calculateMACD(closes);
+  const bb = calculateBollingerBands(closes, 20, 2);
+  const atr = calculateATR(highs, lows, closes, 14);
+  const stoch = calculateStochastic(highs, lows, closes, 14);
+  
+  return {
+    sma20: sma20[sma20.length - 1] || 0,
+    sma50: sma50[sma50.length - 1] || 0,
+    rsi: rsi[rsi.length - 1] || 50,
+    macd: macd.macdLine[macd.macdLine.length - 1] || 0,
+    macdSignal: macd.signalLine[macd.signalLine.length - 1] || 0,
+    macdHistogram: macd.histogram[macd.histogram.length - 1] || 0,
+    bollingerUpper: bb.upper[bb.upper.length - 1] || 0,
+    bollingerLower: bb.lower[bb.lower.length - 1] || 0,
+    bollingerMiddle: bb.middle[bb.middle.length - 1] || 0,
+    atr: atr[atr.length - 1] || 0,
+    stochK: stoch.k[stoch.k.length - 1] || 50,
+    stochD: stoch.d[stoch.d.length - 1] || 50,
+    williamsR: calculateWilliamsR(highs, lows, closes, 14),
+    cci: calculateCCI(highs, lows, closes, 20),
+    momentum: calculateMomentum(closes, 10),
+    roc: calculateROC(closes, 10)
+  };
+}
+
+function calculateSMA(prices: number[], period: number): number[] {
+  const sma = [];
+  for (let i = period - 1; i < prices.length; i++) {
+    const sum = prices.slice(i - period + 1, i + 1).reduce((a, b) => a + b, 0);
+    sma.push(sum / period);
+  }
+  return sma;
+}
+
+function calculateRSI(prices: number[], period: number): number[] {
+  const rsi = [];
+  const gains = [];
+  const losses = [];
+  
+  for (let i = 1; i < prices.length; i++) {
+    const change = prices[i] - prices[i - 1];
+    gains.push(change > 0 ? change : 0);
+    losses.push(change < 0 ? Math.abs(change) : 0);
+  }
+  
+  for (let i = period - 1; i < gains.length; i++) {
+    const avgGain = gains.slice(i - period + 1, i + 1).reduce((a, b) => a + b, 0) / period;
+    const avgLoss = losses.slice(i - period + 1, i + 1).reduce((a, b) => a + b, 0) / period;
+    
+    if (avgLoss === 0) {
+      rsi.push(100);
+    } else {
+      const rs = avgGain / avgLoss;
+      rsi.push(100 - (100 / (1 + rs)));
     }
+  }
+  
+  return rsi;
+}
 
-    if (advancedFeatures.microstructureFeatures.regime_change_probability > 0.7) {
-      warnings.push("🔄 High probability of market regime change");
-    }
+function calculateMACD(prices: number[]) {
+  const ema12 = calculateEMA(prices, 12);
+  const ema26 = calculateEMA(prices, 26);
+  
+  const macdLine = [];
+  for (let i = 0; i < Math.min(ema12.length, ema26.length); i++) {
+    macdLine.push(ema12[i] - ema26[i]);
+  }
+  
+  const signalLine = calculateEMA(macdLine, 9);
+  const histogram = [];
+  
+  for (let i = 0; i < Math.min(macdLine.length, signalLine.length); i++) {
+    histogram.push(macdLine[i] - signalLine[i]);
+  }
+  
+  return { macdLine, signalLine, histogram };
+}
 
-    if (advancedFeatures.priceFeatures.hurst_exponent > 0.7) {
-      warnings.push("📈 Strong trend persistence detected");
-    } else if (advancedFeatures.priceFeatures.hurst_exponent < 0.3) {
-      warnings.push("📉 Mean-reverting behavior detected");
+function calculateEMA(prices: number[], period: number): number[] {
+  const ema = [];
+  const multiplier = 2 / (period + 1);
+  
+  ema[0] = prices[0];
+  
+  for (let i = 1; i < prices.length; i++) {
+    ema[i] = (prices[i] * multiplier) + (ema[i - 1] * (1 - multiplier));
+  }
+  
+  return ema;
+}
+
+function calculateBollingerBands(prices: number[], period: number, stdDev: number) {
+  const sma = calculateSMA(prices, period);
+  const upper = [];
+  const lower = [];
+  const middle = sma;
+  
+  for (let i = period - 1; i < prices.length; i++) {
+    const slice = prices.slice(i - period + 1, i + 1);
+    const mean = slice.reduce((a, b) => a + b, 0) / period;
+    const variance = slice.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / period;
+    const standardDeviation = Math.sqrt(variance);
+    
+    upper.push(sma[i - period + 1] + (standardDeviation * stdDev));
+    lower.push(sma[i - period + 1] - (standardDeviation * stdDev));
+  }
+  
+  return { upper, lower, middle };
+}
+
+function calculateATR(highs: number[], lows: number[], closes: number[], period: number): number[] {
+  const trueRanges = [];
+  
+  for (let i = 1; i < highs.length; i++) {
+    const tr1 = highs[i] - lows[i];
+    const tr2 = Math.abs(highs[i] - closes[i - 1]);
+    const tr3 = Math.abs(lows[i] - closes[i - 1]);
+    trueRanges.push(Math.max(tr1, tr2, tr3));
+  }
+  
+  return calculateSMA(trueRanges, period);
+}
+
+function calculateStochastic(highs: number[], lows: number[], closes: number[], period: number) {
+  const k = [];
+  
+  for (let i = period - 1; i < closes.length; i++) {
+    const highestHigh = Math.max(...highs.slice(i - period + 1, i + 1));
+    const lowestLow = Math.min(...lows.slice(i - period + 1, i + 1));
+    const currentClose = closes[i];
+    
+    if (highestHigh === lowestLow) {
+      k.push(50);
+    } else {
+      k.push(((currentClose - lowestLow) / (highestHigh - lowestLow)) * 100);
     }
   }
+  
+  const d = calculateSMA(k, 3);
+  
+  return { k, d };
+}
 
-  // ML prediction warnings
-  if (mlPrediction) {
-    if (Math.abs(mlPrediction.prediction - 0.5) < 0.1) {
-      warnings.push("🎯 ML prediction is near neutral - direction uncertain");
-    }
+function calculateWilliamsR(highs: number[], lows: number[], closes: number[], period: number): number {
+  if (closes.length < period) return -50;
+  
+  const recentHighs = highs.slice(-period);
+  const recentLows = lows.slice(-period);
+  const currentClose = closes[closes.length - 1];
+  
+  const highestHigh = Math.max(...recentHighs);
+  const lowestLow = Math.min(...recentLows);
+  
+  if (highestHigh === lowestLow) return -50;
+  
+  return ((highestHigh - currentClose) / (highestHigh - lowestLow)) * -100;
+}
 
-    if (mlPrediction.confidence < 0.6) {
-      warnings.push("🤖 ML models disagree - conflicting signals");
-    }
+function calculateCCI(highs: number[], lows: number[], closes: number[], period: number): number {
+  if (closes.length < period) return 0;
+  
+  const typicalPrices = [];
+  for (let i = 0; i < closes.length; i++) {
+    typicalPrices.push((highs[i] + lows[i] + closes[i]) / 3);
   }
+  
+  const recentTypicalPrices = typicalPrices.slice(-period);
+  const sma = recentTypicalPrices.reduce((a, b) => a + b, 0) / period;
+  
+  const meanDeviation = recentTypicalPrices.reduce((sum, price) => {
+    return sum + Math.abs(price - sma);
+  }, 0) / period;
+  
+  const currentTypicalPrice = typicalPrices[typicalPrices.length - 1];
+  
+  if (meanDeviation === 0) return 0;
+  
+  return (currentTypicalPrice - sma) / (0.015 * meanDeviation);
+}
 
-  return warnings.length > 0 ? warnings : [
-    "✅ All ML and statistical checks passed",
-    "📊 Models show good agreement and confidence"
-  ];
+function calculateMomentum(prices: number[], period: number): number {
+  if (prices.length < period + 1) return 0;
+  
+  const currentPrice = prices[prices.length - 1];
+  const pastPrice = prices[prices.length - 1 - period];
+  
+  return currentPrice - pastPrice;
+}
+
+function calculateROC(prices: number[], period: number): number {
+  if (prices.length < period + 1) return 0;
+  
+  const currentPrice = prices[prices.length - 1];
+  const pastPrice = prices[prices.length - 1 - period];
+  
+  if (pastPrice === 0) return 0;
+  
+  return ((currentPrice - pastPrice) / pastPrice) * 100;
 }

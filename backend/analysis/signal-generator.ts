@@ -1,386 +1,324 @@
-import { APIError } from "encore.dev/api";
-import { generateTradeId } from "./utils";
-import { fetchMarketData } from "./market-data";
-import { analyzeWithAI } from "./ai-engine";
-import { generateChart } from "./chart-generator";
-import { analyzeSentiment } from "./sentiment-analyzer";
-import { 
-  TradingStrategy,
-  TRADING_STRATEGIES, 
-  calculateStrategyTargets, 
-  getOptimalStrategy,
-  getStrategyRecommendation,
-  calculatePositionSize,
-  calculateAdaptiveParams,
-  getMarketRegime,
-  analyzeStatisticalArbitrage,
-  analyzeMomentumBreakout,
-  analyzeOrderFlow,
-  StrategyPerformance
-} from "./trading-strategies";
-import type { Mt5Config } from "~backend/user/api";
+import { api } from "encore.dev/api";
+import { SQLDatabase } from "encore.dev/storage/sqldb";
 
-export interface TradingSignal {
-  tradeId: string;
+const db = new SQLDatabase("trading", {
+  migrations: "./migrations",
+});
+
+interface TradingStrategy {
+  name: string;
+  indicators: string[];
+  thresholds: {
+    buy: number;
+    sell: number;
+  };
+  riskLevel: number;
+}
+
+const TRADING_STRATEGIES: Record<string, TradingStrategy> = {
+  conservative: {
+    name: "Conservative",
+    indicators: ["SMA", "RSI"],
+    thresholds: { buy: 0.7, sell: 0.3 },
+    riskLevel: 0.2
+  },
+  moderate: {
+    name: "Moderate", 
+    indicators: ["SMA", "RSI", "MACD"],
+    thresholds: { buy: 0.6, sell: 0.4 },
+    riskLevel: 0.5
+  },
+  aggressive: {
+    name: "Aggressive",
+    indicators: ["SMA", "RSI", "MACD", "BB"],
+    thresholds: { buy: 0.5, sell: 0.5 },
+    riskLevel: 0.8
+  }
+};
+
+interface GenerateSignalRequest {
   symbol: string;
-  direction: "LONG" | "SHORT";
-  strategy: TradingStrategy;
-  entryPrice: number;
-  takeProfit: number;
-  stopLoss: number;
+  timeframe: string;
+  strategy?: string;
+}
+
+interface TradingSignal {
+  symbol: string;
+  action: "BUY" | "SELL" | "HOLD";
   confidence: number;
-  riskRewardRatio: number;
-  recommendedLotSize: number;
-  maxHoldingTime: number;
-  expiresAt: Date;
-  chartUrl?: string;
-  strategyRecommendation: string;
-  analysis: any;
-  // Enhanced fields
-  marketRegime?: any;
-  adaptiveParams?: any;
-  strategySpecificAnalysis?: any;
-  riskMetrics?: {
-    var95: number;
-    expectedShortfall: number;
-    drawdownRisk: number;
-    leverageAdjusted: boolean;
-  };
+  price: number;
+  timestamp: Date;
+  strategy: string;
+  indicators: Record<string, number>;
 }
 
-export async function generateSignalForSymbol(
-  symbol: string, 
-  mt5Config: Mt5Config,
-  tradeParams: { accountBalance: number, riskPercentage: number },
-  userStrategy?: TradingStrategy,
-  requireRealData: boolean = false
-): Promise<TradingSignal> {
-  const tradeId = generateTradeId(symbol);
+interface GenerateSignalResponse {
+  signal: TradingSignal;
+}
 
-  console.log(`Starting prediction for ${symbol} with trade ID ${tradeId}`);
-  
-  const { accountBalance, riskPercentage } = tradeParams;
-
-  const marketData = await fetchMarketData(symbol, ["1m", "5m", "15m", "30m", "1h"], mt5Config, requireRealData);
-  
-  const availableTimeframes = Object.keys(marketData);
-  if (availableTimeframes.length === 0) {
-    throw APIError.unavailable(`Unable to fetch market data for ${symbol}.`);
-  }
-  
-  const requiredTimeframes = ["5m", "15m", "30m"];
-  const completeMarketData: any = {};
-  const fallbackTimeframe = availableTimeframes.includes("5m") ? "5m" : availableTimeframes[0];
-  const fallbackData = (marketData as any)[fallbackTimeframe];
-
-  for (const tf of requiredTimeframes) {
-    completeMarketData[tf] = (marketData as any)[tf] || fallbackData;
-  }
-  if ((marketData as any)["1m"]) completeMarketData["1m"] = (marketData as any)["1m"];
-  if ((marketData as any)["1h"]) completeMarketData["1h"] = (marketData as any)["1h"];
-  
-  // Get historical performance data (would come from database in real implementation)
-  const historicalPerformance = new Map<TradingStrategy, StrategyPerformance>();
-  
-  const optimalStrategy = getOptimalStrategy(
-    completeMarketData, 
-    symbol, 
-    userStrategy, 
-    aiAnalysis, 
-    historicalPerformance
-  );
-  
-  console.log(`Performing AI analysis for ${symbol} with strategy ${optimalStrategy}`);
-  const aiAnalysis = await analyzeWithAI(completeMarketData, symbol, optimalStrategy);
-  
-  const strategyConfig = TRADING_STRATEGIES[optimalStrategy];
-  
-  console.log(`Selected strategy: ${optimalStrategy} for ${symbol}`);
-  
-  const sentimentAnalysis = await analyzeSentiment(symbol);
-  
-  const currentPrice = completeMarketData["5m"].close;
-  const atr = completeMarketData["5m"].indicators.atr;
-  const spread = completeMarketData["5m"].spread;
-  
-  // Calculate adaptive parameters
-  const adaptiveParams = calculateAdaptiveParams(
-    optimalStrategy,
-    completeMarketData,
-    aiAnalysis
-  );
-  
-  // Get market regime
-  const marketRegime = getMarketRegime(completeMarketData, aiAnalysis);
-  
-  // Strategy-specific analysis
-  let strategySpecificAnalysis: any = {};
-  
-  switch (optimalStrategy) {
-    case TradingStrategy.STATISTICAL_ARBITRAGE:
-      strategySpecificAnalysis = analyzeStatisticalArbitrage(
-        completeMarketData, symbol, aiAnalysis
-      );
-      break;
+// Generates trading signals based on technical analysis
+export const generateSignal = api<GenerateSignalRequest, GenerateSignalResponse>(
+  { expose: true, method: "POST", path: "/analysis/signal" },
+  async (req) => {
+    const { symbol, timeframe, strategy = "moderate" } = req;
     
-    case TradingStrategy.MOMENTUM_BREAKOUT:
-      strategySpecificAnalysis = analyzeMomentumBreakout(
-        completeMarketData, symbol, aiAnalysis
-      );
-      break;
+    // Get market data
+    const marketData = await getMarketData(symbol, timeframe);
     
-    case TradingStrategy.ORDER_FLOW:
-      strategySpecificAnalysis = analyzeOrderFlow(
-        completeMarketData, symbol, aiAnalysis
-      );
-      break;
+    // Calculate technical indicators
+    const indicators = await calculateIndicators(marketData);
     
-    default:
-      // Use standard analysis for other strategies
-      strategySpecificAnalysis = {
-        signal: aiAnalysis.direction,
-        confidence: aiAnalysis.confidence,
-        analysis: "Standard technical analysis"
-      };
+    // Determine optimal strategy if not specified
+    const optimalStrategy = strategy || await determineOptimalStrategy(marketData, indicators);
+    const strategyConfig = TRADING_STRATEGIES[optimalStrategy];
+    
+    // Generate signal based on strategy
+    const signal = await generateTradingSignal(
+      symbol,
+      marketData,
+      indicators,
+      strategyConfig
+    );
+    
+    // Store signal in database
+    await storeSignal(signal);
+    
+    return { signal };
   }
-  
-  // Override direction if strategy-specific analysis provides better signal
-  if (strategySpecificAnalysis.signal && 
-      strategySpecificAnalysis.confidence > aiAnalysis.confidence) {
-    aiAnalysis.direction = strategySpecificAnalysis.signal;
-    aiAnalysis.confidence = strategySpecificAnalysis.confidence;
-  }
-  
-  const priceTargets = calculateStrategyTargets(
-    optimalStrategy, 
-    currentPrice, 
-    atr, 
-    aiAnalysis.direction, 
-    symbol, 
-    spread,
-    completeMarketData,
-    aiAnalysis,
-    adaptiveParams
-  );
-  
-  // Enhanced position sizing with adaptive parameters
-  let basePositionSize = calculatePositionSize(
-    optimalStrategy, accountBalance, riskPercentage, priceTargets.riskAmount
-  );
-  
-  // Apply adaptive adjustments
-  const strategyConfig = TRADING_STRATEGIES[optimalStrategy];
-  let adjustedLotSize = basePositionSize;
-  
-  // Market regime adjustments
-  if (marketRegime.type === "CRISIS") {
-    adjustedLotSize *= 0.5; // Reduce size in crisis
-  } else if (marketRegime.type === "TRENDING" && marketRegime.confidence > 0.8) {
-    adjustedLotSize *= Math.min(1.3, strategyConfig.leverageMultiplier); // Increase in strong trends
-  }
-  
-  // ML confidence adjustments
-  if (aiAnalysis.enhancedConfidence?.mlScore) {
-    const mlScore = aiAnalysis.enhancedConfidence.mlScore;
-    if (mlScore > 80) {
-      adjustedLotSize *= 1.2;
-    } else if (mlScore < 60) {
-      adjustedLotSize *= 0.8;
-    }
-  }
-  
-  // Strategy-specific sizing
-  if (optimalStrategy === TradingStrategy.PAIRS_TRADING || 
-      optimalStrategy === TradingStrategy.STATISTICAL_ARBITRAGE) {
-    // Market-neutral strategies can use higher leverage
-    adjustedLotSize *= strategyConfig.leverageMultiplier;
-  }
-  
-  const recommendedLotSize = Math.max(0.01, Math.min(
-    adjustedLotSize, 
-    strategyConfig.maxLotSize
-  ));
-  
-  const strategyRecommendation = getStrategyRecommendation(optimalStrategy, completeMarketData, aiAnalysis);
-  
-  const chartUrl = await generateChart(symbol, completeMarketData, aiAnalysis);
-  
-  const riskLevel = determineRiskLevel(optimalStrategy, aiAnalysis, completeMarketData);
-  
-  const confidenceInt = Math.round(aiAnalysis.confidence);
-  const maxHoldingTimeHours = Number(strategyConfig.maxHoldingTime);
-  const expiresAt = calculateExpirationTime(optimalStrategy, maxHoldingTimeHours);
+);
 
-  // Calculate advanced risk metrics
-  const riskMetrics = calculateAdvancedRiskMetrics(
-    optimalStrategy,
-    priceTargets,
-    recommendedLotSize,
-    accountBalance,
-    marketRegime,
-    aiAnalysis
-  );
+async function getMarketData(symbol: string, timeframe: string) {
+  // Simulate market data - in real implementation, fetch from market data provider
+  const mockData = [];
+  const basePrice = 100;
   
-  const signal: TradingSignal = {
-    tradeId,
-    symbol,
-    direction: aiAnalysis.direction,
-    strategy: optimalStrategy,
-    entryPrice: priceTargets.entryPrice,
-    takeProfit: priceTargets.takeProfit,
-    stopLoss: priceTargets.stopLoss,
-    confidence: confidenceInt,
-    riskRewardRatio: priceTargets.riskRewardRatio,
-    recommendedLotSize,
-    maxHoldingTime: maxHoldingTimeHours,
-    expiresAt,
-    chartUrl,
-    strategyRecommendation,
-    analysis: {
-      technical: { ...aiAnalysis.technical, ...aiAnalysis.priceAction, support: aiAnalysis.support, resistance: aiAnalysis.resistance },
-      smartMoney: aiAnalysis.smartMoney,
-      professional: aiAnalysis.professionalAnalysis,
-      sentiment: { ...sentimentAnalysis, summary: sentimentAnalysis.summary },
-      volatility: aiAnalysis.volatility,
-      strategy: { 
-        name: strategyConfig.name, 
-        description: strategyConfig.description, 
-        timeframes: strategyConfig.timeframes, 
-        marketConditions: strategyConfig.marketConditions, 
-        riskLevel,
-        adaptiveParameters: strategyConfig.adaptiveParameters,
-        mlDriven: strategyConfig.mlDriven,
-        institutionalAlignment: strategyConfig.institutionalAlignment
-      },
-      enhancedTechnical: aiAnalysis.enhancedTechnical,
-      vwap: aiAnalysis.vwap,
-      dataSource: completeMarketData["5m"].source,
-      // New enhanced analysis
-      institutionalAnalysis: aiAnalysis.institutionalAnalysis,
-      enhancedConfidence: aiAnalysis.enhancedConfidence
-    },
-    // Enhanced fields
-    marketRegime,
-    adaptiveParams,
-    strategySpecificAnalysis,
-    riskMetrics
-  };
-
-  return signal;
+  for (let i = 0; i < 100; i++) {
+    const price = basePrice + Math.random() * 20 - 10;
+    mockData.push({
+      timestamp: new Date(Date.now() - (100 - i) * 60000),
+      open: price,
+      high: price * 1.02,
+      low: price * 0.98,
+      close: price,
+      volume: Math.floor(Math.random() * 1000000)
+    });
+  }
+  
+  return mockData;
 }
 
-function calculateExpirationTime(strategy: TradingStrategy, maxHoldingHours: number): Date {
-  const now = new Date();
-  const expiresAt = new Date(now.getTime() + maxHoldingHours * 60 * 60 * 1000);
+async function calculateIndicators(marketData: any[]) {
+  const closes = marketData.map(d => d.close);
   
-  if (strategy === TradingStrategy.INTRADAY) {
-    const nyCloseTime = new Date(now);
-    nyCloseTime.setUTCHours(21, 30, 0, 0);
-    if (nyCloseTime <= now) {
-      nyCloseTime.setDate(nyCloseTime.getDate() + 1);
-    }
-    return expiresAt < nyCloseTime ? expiresAt : nyCloseTime;
-  }
+  // Simple Moving Average (20 periods)
+  const sma = calculateSMA(closes, 20);
   
-  return expiresAt;
-}
-
-function determineRiskLevel(strategy: TradingStrategy, aiAnalysis: any, marketData: any): "LOW" | "MEDIUM" | "HIGH" {
-  const strategyConfig = TRADING_STRATEGIES[strategy];
-  const volatility = calculateMarketVolatility(marketData);
+  // RSI (14 periods)
+  const rsi = calculateRSI(closes, 14);
   
-  let riskScore = 0;
-  switch (strategy) {
-    case TradingStrategy.SCALPING: riskScore = 2; break;
-    case TradingStrategy.INTRADAY: riskScore = 1; break;
-  }
+  // MACD
+  const macd = calculateMACD(closes);
   
-  if (aiAnalysis.confidence < 75) riskScore += 1;
-  if (aiAnalysis.confidence > 90) riskScore -= 1;
-  if (volatility > strategyConfig.volatilityThreshold * 1.5) riskScore += 1;
-  if (volatility < strategyConfig.volatilityThreshold * 0.5) riskScore -= 1;
-  if (aiAnalysis.priceAction.structure === "NEUTRAL") riskScore += 1;
-  if (aiAnalysis.smartMoney.institutionalFlow === "NEUTRAL") riskScore += 1;
-  
-  if (riskScore <= 1) return "LOW";
-  if (riskScore <= 3) return "MEDIUM";
-  return "HIGH";
-}
-
-/**
- * Calculate advanced risk metrics for the trading signal
- */
-function calculateAdvancedRiskMetrics(
-  strategy: TradingStrategy,
-  priceTargets: any,
-  lotSize: number,
-  accountBalance: number,
-  marketRegime: any,
-  aiAnalysis: any
-): {
-  var95: number;
-  expectedShortfall: number;
-  drawdownRisk: number;
-  leverageAdjusted: boolean;
-} {
-  const config = TRADING_STRATEGIES[strategy];
-  
-  // Calculate Value at Risk (95% confidence level)
-  const riskAmount = priceTargets.riskAmount * lotSize;
-  const accountRiskPercentage = (riskAmount / accountBalance) * 100;
-  
-  // VaR calculation (simplified)
-  let var95 = accountRiskPercentage;
-  
-  // Adjust VaR based on market regime
-  switch (marketRegime.type) {
-    case "CRISIS":
-      var95 *= 2.5; // Much higher risk in crisis
-      break;
-    case "VOLATILE":
-      var95 *= 1.8;
-      break;
-    case "LOW_VOL":
-      var95 *= 0.7;
-      break;
-    default:
-      var95 *= 1.0;
-  }
-  
-  // Expected Shortfall (conditional VaR)
-  const expectedShortfall = var95 * 1.3; // ES is typically 1.3x VaR for normal distribution
-  
-  // Drawdown risk based on strategy characteristics
-  let drawdownRisk = config.drawdownLimit * 100; // Convert to percentage
-  
-  // Adjust for strategy-specific risks
-  if (config.riskModel === "VaR") {
-    drawdownRisk *= 0.8; // VaR-based strategies have better risk control
-  } else if (config.riskModel === "VOLATILITY_BASED") {
-    drawdownRisk *= 1.2; // Vol-based can have larger swings
-  }
-  
-  // Check if leverage is being used
-  const leverageAdjusted = lotSize > config.maxLotSize * 0.8;
+  // Bollinger Bands
+  const bb = calculateBollingerBands(closes, 20, 2);
   
   return {
-    var95: Math.round(var95 * 100) / 100,
-    expectedShortfall: Math.round(expectedShortfall * 100) / 100,
-    drawdownRisk: Math.round(drawdownRisk * 100) / 100,
-    leverageAdjusted
+    SMA: sma[sma.length - 1],
+    RSI: rsi[rsi.length - 1],
+    MACD: macd.histogram[macd.histogram.length - 1],
+    BB_UPPER: bb.upper[bb.upper.length - 1],
+    BB_LOWER: bb.lower[bb.lower.length - 1],
+    BB_MIDDLE: bb.middle[bb.middle.length - 1]
   };
 }
 
-function calculateMarketVolatility(marketData: any): number {
-  const data5m = marketData["5m"];
-  const data15m = marketData["15m"];
-  const data30m = marketData["30m"];
+function calculateSMA(prices: number[], period: number): number[] {
+  const sma = [];
+  for (let i = period - 1; i < prices.length; i++) {
+    const sum = prices.slice(i - period + 1, i + 1).reduce((a, b) => a + b, 0);
+    sma.push(sum / period);
+  }
+  return sma;
+}
+
+function calculateRSI(prices: number[], period: number): number[] {
+  const rsi = [];
+  const gains = [];
+  const losses = [];
   
-  const volatilities = [
-    data5m.indicators.atr / data5m.close,
-    data15m.indicators.atr / data15m.close,
-    data30m.indicators.atr / data30m.close
-  ];
+  for (let i = 1; i < prices.length; i++) {
+    const change = prices[i] - prices[i - 1];
+    gains.push(change > 0 ? change : 0);
+    losses.push(change < 0 ? Math.abs(change) : 0);
+  }
   
-  return volatilities.reduce((sum, vol) => sum + vol, 0) / volatilities.length;
+  for (let i = period - 1; i < gains.length; i++) {
+    const avgGain = gains.slice(i - period + 1, i + 1).reduce((a, b) => a + b, 0) / period;
+    const avgLoss = losses.slice(i - period + 1, i + 1).reduce((a, b) => a + b, 0) / period;
+    
+    if (avgLoss === 0) {
+      rsi.push(100);
+    } else {
+      const rs = avgGain / avgLoss;
+      rsi.push(100 - (100 / (1 + rs)));
+    }
+  }
+  
+  return rsi;
+}
+
+function calculateMACD(prices: number[]) {
+  const ema12 = calculateEMA(prices, 12);
+  const ema26 = calculateEMA(prices, 26);
+  
+  const macdLine = [];
+  for (let i = 0; i < Math.min(ema12.length, ema26.length); i++) {
+    macdLine.push(ema12[i] - ema26[i]);
+  }
+  
+  const signalLine = calculateEMA(macdLine, 9);
+  const histogram = [];
+  
+  for (let i = 0; i < Math.min(macdLine.length, signalLine.length); i++) {
+    histogram.push(macdLine[i] - signalLine[i]);
+  }
+  
+  return { macdLine, signalLine, histogram };
+}
+
+function calculateEMA(prices: number[], period: number): number[] {
+  const ema = [];
+  const multiplier = 2 / (period + 1);
+  
+  ema[0] = prices[0];
+  
+  for (let i = 1; i < prices.length; i++) {
+    ema[i] = (prices[i] * multiplier) + (ema[i - 1] * (1 - multiplier));
+  }
+  
+  return ema;
+}
+
+function calculateBollingerBands(prices: number[], period: number, stdDev: number) {
+  const sma = calculateSMA(prices, period);
+  const upper = [];
+  const lower = [];
+  const middle = sma;
+  
+  for (let i = period - 1; i < prices.length; i++) {
+    const slice = prices.slice(i - period + 1, i + 1);
+    const mean = slice.reduce((a, b) => a + b, 0) / period;
+    const variance = slice.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / period;
+    const standardDeviation = Math.sqrt(variance);
+    
+    upper.push(sma[i - period + 1] + (standardDeviation * stdDev));
+    lower.push(sma[i - period + 1] - (standardDeviation * stdDev));
+  }
+  
+  return { upper, lower, middle };
+}
+
+async function determineOptimalStrategy(marketData: any[], indicators: any): Promise<string> {
+  // Simple strategy selection based on market volatility
+  const prices = marketData.map(d => d.close);
+  const volatility = calculateVolatility(prices);
+  
+  if (volatility < 0.02) return "conservative";
+  if (volatility < 0.05) return "moderate";
+  return "aggressive";
+}
+
+function calculateVolatility(prices: number[]): number {
+  const returns = [];
+  for (let i = 1; i < prices.length; i++) {
+    returns.push((prices[i] - prices[i - 1]) / prices[i - 1]);
+  }
+  
+  const mean = returns.reduce((a, b) => a + b, 0) / returns.length;
+  const variance = returns.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / returns.length;
+  
+  return Math.sqrt(variance);
+}
+
+async function generateTradingSignal(
+  symbol: string,
+  marketData: any[],
+  indicators: any,
+  strategy: TradingStrategy
+): Promise<TradingSignal> {
+  const currentPrice = marketData[marketData.length - 1].close;
+  
+  // Calculate signal strength based on indicators
+  let signalStrength = 0;
+  let signalCount = 0;
+  
+  // RSI analysis
+  if (indicators.RSI < 30) {
+    signalStrength += 1; // Oversold - buy signal
+  } else if (indicators.RSI > 70) {
+    signalStrength -= 1; // Overbought - sell signal
+  }
+  signalCount++;
+  
+  // SMA analysis
+  if (currentPrice > indicators.SMA) {
+    signalStrength += 0.5; // Price above SMA - bullish
+  } else {
+    signalStrength -= 0.5; // Price below SMA - bearish
+  }
+  signalCount++;
+  
+  // MACD analysis
+  if (indicators.MACD > 0) {
+    signalStrength += 0.5; // Positive MACD - bullish
+  } else {
+    signalStrength -= 0.5; // Negative MACD - bearish
+  }
+  signalCount++;
+  
+  // Bollinger Bands analysis
+  if (currentPrice < indicators.BB_LOWER) {
+    signalStrength += 0.5; // Price below lower band - buy signal
+  } else if (currentPrice > indicators.BB_UPPER) {
+    signalStrength -= 0.5; // Price above upper band - sell signal
+  }
+  signalCount++;
+  
+  const normalizedSignal = signalStrength / signalCount;
+  
+  let action: "BUY" | "SELL" | "HOLD";
+  let confidence: number;
+  
+  if (normalizedSignal >= strategy.thresholds.buy) {
+    action = "BUY";
+    confidence = Math.min(normalizedSignal, 1);
+  } else if (normalizedSignal <= -strategy.thresholds.sell) {
+    action = "SELL";
+    confidence = Math.min(Math.abs(normalizedSignal), 1);
+  } else {
+    action = "HOLD";
+    confidence = 1 - Math.abs(normalizedSignal);
+  }
+  
+  return {
+    symbol,
+    action,
+    confidence,
+    price: currentPrice,
+    timestamp: new Date(),
+    strategy: strategy.name,
+    indicators
+  };
+}
+
+async function storeSignal(signal: TradingSignal): Promise<void> {
+  await db.exec`
+    INSERT INTO trading_signals (
+      symbol, action, confidence, price, timestamp, strategy, indicators
+    ) VALUES (
+      ${signal.symbol}, ${signal.action}, ${signal.confidence}, 
+      ${signal.price}, ${signal.timestamp}, ${signal.strategy}, 
+      ${JSON.stringify(signal.indicators)}
+    )
+  `;
 }

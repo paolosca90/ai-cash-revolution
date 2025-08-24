@@ -34,32 +34,7 @@ The backend will be available at the URL shown in your terminal (typically `http
 
 
 
-### Frontend Setup
 
-1. Navigate to the frontend directory:
-   ```bash
-   cd frontend
-   ```
-
-2. Install the dependencies:
-   ```bash
-   npm install
-   ```
-
-3. Start the development server:
-   ```bash
-   npx vite dev
-   ```
-
-The frontend will be available at `http://localhost:5173` (or the next available port).
-
-
-### Generate Frontend Client
-To generate the frontend client, run the following command in the `backend` directory:
-
-```bash
-encore gen client --target leap
-```
 
 ## Deployment
 
@@ -82,7 +57,7 @@ encore auth login
 Add Encore's git remote to enable direct deployment:
 
 ```bash
-git remote add encore encore://telegram-trading-bot-d6u2
+git remote add encore encore://ai-trading-bot-fixes-gyx2
 ```
 
 #### Step 3: Deploy Your Application
@@ -95,7 +70,7 @@ git commit -m "Deploy to Encore Cloud"
 git push encore
 ```
 
-Monitor your deployment progress in the [Encore Cloud dashboard](https://app.encore.dev/telegram-trading-bot-d6u2/deploys).
+Monitor your deployment progress in the [Encore Cloud dashboard](https://app.encore.dev/ai-trading-bot-fixes-gyx2/deploys).
 
 ## GitHub Integration (Recommended for Production)
 
@@ -104,7 +79,7 @@ For production applications, we recommend integrating with GitHub instead of usi
 ### Connecting Your GitHub Account
 
 1. Open your app in the **Encore Cloud dashboard**
-2. Navigate to Encore Cloud [GitHub Integration settings](https://app.encore.cloud/telegram-trading-bot-d6u2/settings/integrations/github)
+2. Navigate to Encore Cloud [GitHub Integration settings](https://app.encore.cloud/ai-trading-bot-fixes-gyx2/settings/integrations/github)
 3. Click **Connect Account to GitHub**
 4. Grant access to your repository
 
