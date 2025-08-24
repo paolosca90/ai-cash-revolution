@@ -1,8 +1,9 @@
-import React, { useMemo, useCallback, Suspense, lazy } from "react";
+import React, { useMemo, useCallback, Suspense, lazy, useEffect, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useBackend } from "../hooks/useBackend";
 import StatCard from "../components/cards/StatCard";
 import AutoSignalCard from "../components/cards/AutoSignalCard";
+import MobileDashboard from "../components/MobileDashboard";
 import { DollarSign, Percent, TrendingUp, TrendingDown, Zap, BarChart, Brain, Target, Activity, AlertCircle, Award, Shield, Sparkles, RefreshCw, Clock, Database, Wifi, WifiOff } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -57,11 +58,34 @@ function useResponsiveBreakpoint() {
   return breakpoint;
 }
 
+// Custom hook to detect mobile device
+function useIsMobile() {
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const checkIsMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    
+    checkIsMobile();
+    window.addEventListener('resize', checkIsMobile);
+    return () => window.removeEventListener('resize', checkIsMobile);
+  }, []);
+
+  return isMobile;
+}
+
 export default function Dashboard() {
   const backend = useBackend();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
+  const isMobile = useIsMobile();
+
+  // If mobile, render the mobile-optimized dashboard
+  if (isMobile) {
+    return <MobileDashboard />;
+  }
 
   const { data: topSignalsData, isLoading: isLoadingTopSignals, error: topSignalsError, refetch: refetchTopSignals } = useQuery({
     queryKey: ["topSignals"],
