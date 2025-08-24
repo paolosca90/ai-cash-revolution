@@ -1,1 +1,1 @@
-{"id": "telegram-trading-bot-d6u2", "lang": "typescript"}
+{"id": "ai-trading-bot-fixes-gyx2", "lang": "typescript"}
