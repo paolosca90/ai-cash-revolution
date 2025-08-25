@@ -1,1 +1,1 @@
-web: cd backend && npm run db:migrate && npm start
+web: npm run db:migrate --prefix backend && npm start --prefix backend

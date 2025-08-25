@@ -5,10 +5,10 @@ NODE_VERSION = "18"
 nixPkgs = ["nodejs-18_x", "npm-9_x"]
 
 [phases.install]
-cmds = ["cd backend && npm ci"]
+cmds = ["npm ci --prefix backend"]
 
 [phases.build] 
-cmds = ["cd backend && npm run build"]
+cmds = ["npm run build --prefix backend"]
 
 [phases.start]
-cmd = "cd backend && npm run db:migrate && npm start"
+cmd = "npm run db:migrate --prefix backend && npm start --prefix backend"

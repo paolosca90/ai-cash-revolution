@@ -2,13 +2,13 @@
   "$schema": "https://railway.app/railway.schema.json",
   "build": {
     "builder": "nixpacks",
-    "buildCommand": "cd backend && npm ci && npm run build",
+    "buildCommand": "npm ci --prefix backend && npm run build --prefix backend",
     "watchPatterns": [
       "backend/**"
     ]
   },
   "deploy": {
-    "startCommand": "cd backend && npm run db:migrate && npm start",
+    "startCommand": "npm run db:migrate --prefix backend && npm start --prefix backend",
     "restartPolicyType": "always"
   }
 }
