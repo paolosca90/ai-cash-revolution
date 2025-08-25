@@ -442,4 +442,6 @@ CREATE INDEX IF NOT EXISTS idx_vps_client ON client_vps_instances(client_id);
 CREATE INDEX IF NOT EXISTS idx_vps_status ON client_vps_instances(status);
 `;
 
+// Export per Vercel function
+module.exports = router;
 export default router;

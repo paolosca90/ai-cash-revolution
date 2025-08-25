@@ -470,4 +470,6 @@ router.get('/stats', authenticateAdmin, async (req, res) => {
   }
 });
 
+// Export per Vercel function
+module.exports = router;
 export default router;

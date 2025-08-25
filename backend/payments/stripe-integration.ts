@@ -408,4 +408,6 @@ async function sendWelcomeEmail(email: string, name: string, data: any) {
   // TODO: Implementare con SendGrid
 }
 
+// Export per Vercel function
+module.exports = router;
 export default router;
