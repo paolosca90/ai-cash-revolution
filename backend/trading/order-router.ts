@@ -3,7 +3,7 @@ import { SQLDatabase } from "encore.dev/storage/sqldb";
 import { Secret } from "encore.dev/config";
 
 // Database connection for order routing
-const db = new SQLDatabase("trading_orders", {
+const db = new SQLDatabase("orders", {
   migrations: "./order_migrations",
 });
 
