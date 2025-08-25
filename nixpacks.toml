@@ -1,8 +1,17 @@
-[phases.build]
-cmds = ["cd backend && npm ci", "cd backend && npm run build"]
+[variables]
+NODE_VERSION = "18"
+
+[phases.setup]
+nixPkgs = ["nodejs-18_x", "npm-9_x"]
+
+[phases.install]
+cmds = ["cd backend && npm ci --only=production"]
+
+[phases.build] 
+cmds = ["cd backend && npm run build"]
 
 [phases.start]
 cmd = "cd backend && npm start"
 
-[variables]
-NODE_VERSION = "18"
+[staticAssets]
+"backend/src" = "./"
