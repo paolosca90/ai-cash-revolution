@@ -1,9 +1,5 @@
 import { api } from "encore.dev/api";
-import { SQLDatabase } from "encore.dev/storage/sqldb";
-
-const db = new SQLDatabase("trading", {
-  migrations: "./migrations",
-});
+import { analysisDB } from "./db";
 
 interface MarketData {
   timestamp: Date;

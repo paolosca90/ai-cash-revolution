@@ -1,7 +1,7 @@
 import { api } from "encore.dev/api";
 import { SQLDatabase } from "encore.dev/storage/sqldb";
 
-const db = new SQLDatabase("trading", {
+const db = new SQLDatabase("signals", {
   migrations: "./migrations",
 });
 
