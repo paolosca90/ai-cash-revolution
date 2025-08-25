@@ -7,8 +7,8 @@ WORKDIR /app
 # Copy backend package files
 COPY backend/package*.json ./backend/
 
-# Install dependencies
-RUN cd backend && npm ci --only=production
+# Install dependencies (including dev dependencies for tsx)
+RUN cd backend && npm ci
 
 # Copy backend source code
 COPY backend/ ./backend/
@@ -19,5 +19,5 @@ EXPOSE $PORT
 # Set environment
 ENV NODE_ENV=production
 
-# Start the application
-CMD ["sh", "-c", "cd backend && npm start"]
+# Start the application (migrations will run at startup)
+CMD ["sh", "-c", "cd backend && npm run db:migrate && npm start"]

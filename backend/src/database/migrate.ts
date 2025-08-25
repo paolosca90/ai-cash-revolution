@@ -72,8 +72,18 @@ export async function runMigrations(): Promise<void> {
   try {
     console.log('🔄 Starting database migrations...');
     
-    // Test database connection
-    await testConnection();
+    // Test database connection with retries
+    const maxRetries = 5;
+    for (let i = 0; i < maxRetries; i++) {
+      try {
+        await testConnection();
+        break;
+      } catch (error) {
+        console.log(`Database connection attempt ${i + 1}/${maxRetries} failed, retrying...`);
+        if (i === maxRetries - 1) throw error;
+        await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds
+      }
+    }
     
     // Create migrations table if it doesn't exist
     await createMigrationsTable();

@@ -5,13 +5,10 @@ NODE_VERSION = "18"
 nixPkgs = ["nodejs-18_x", "npm-9_x"]
 
 [phases.install]
-cmds = ["cd backend && npm ci --only=production"]
+cmds = ["cd backend && npm ci"]
 
 [phases.build] 
 cmds = ["cd backend && npm run build"]
 
 [phases.start]
-cmd = "cd backend && npm start"
-
-[staticAssets]
-"backend/src" = "./"
+cmd = "cd backend && npm run db:migrate && npm start"
