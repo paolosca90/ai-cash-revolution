@@ -18,7 +18,6 @@ export default defineConfig({
       fastRefresh: true,
     }),
   ],
-  mode: "development",
   build: {
     // Enable minification for production
     minify: 'terser',
