@@ -58,7 +58,6 @@ export interface TestConnectionResponse {
   accountInfo: {
     balance?: number;
     currency?: string;
-    [key: string]: any;
   } | null;
   lastTestedAt: Date;
 }
