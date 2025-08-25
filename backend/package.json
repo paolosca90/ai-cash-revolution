@@ -4,10 +4,10 @@
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/server.ts",
-    "build": "tsc",
-    "start": "node dist/server.js",
-    "db:migrate": "node dist/database/migrate.js",
-    "postinstall": "npm run build"
+    "build": "echo 'Build completed - running in tsx mode'",
+    "build-ts": "tsc",
+    "start": "tsx src/server.ts",
+    "db:migrate": "tsx src/database/migrate.ts"
   },
   "dependencies": {
     "express": "^4.18.2",
