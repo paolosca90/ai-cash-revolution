@@ -65,6 +65,26 @@ export interface PositionCloseRequest {
   volume?: number; // Partial close if specified
 }
 
+export interface OrderWithAccountInfo extends Order {
+  accountName: string;
+  brokerName: string;
+}
+
+export interface OrderHistoryResponse {
+  orders: OrderWithAccountInfo[];
+  totalCount: number;
+  hasMore: boolean;
+}
+
+export interface OrderSummary {
+  totalOrders: number;
+  pendingOrders: number;
+  filledOrders: number;
+  cancelledOrders: number;
+  totalVolume: number;
+  totalPnL: number;
+}
+
 // Helper functions
 const validateOrderRequest = (req: OrderRequest): void => {
   if (!req.userId || !req.accountId || !req.symbol) {
@@ -349,7 +369,7 @@ export const placeOrder = api(
 // Get order status
 export const getOrderStatus = api(
   { method: "GET", path: "/trading/orders/:orderId", expose: true },
-  async ({ orderId, userId }: { orderId: string; userId: string }): Promise<any> => {
+  async ({ orderId, userId }: { orderId: string; userId: string }): Promise<OrderWithAccountInfo> => {
     try {
       const orders = await db.query`
         SELECT o.*, ta.account_name, ta.broker_name
@@ -379,7 +399,7 @@ export const getOrderStatus = api(
 // List user orders
 export const listOrders = api(
   { method: "GET", path: "/trading/orders", expose: true },
-  async ({ userId, limit = 50 }: { userId: string; limit?: number }): Promise<any> => {
+  async ({ userId, limit = 50 }: { userId: string; limit?: number }): Promise<OrderHistoryResponse> => {
     try {
       const orders = await db.query`
         SELECT o.*, ta.account_name, ta.broker_name
@@ -450,7 +470,7 @@ export const autoExecuteSignal = api(
     userId: string;
     signalId: string;
     accountIds?: string[];
-  }): Promise<any> => {
+  }): Promise<{ success: boolean; message: string; orders?: OrderResponse[] }> => {
     try {
       // Get signal details
       const signals = await db.query`
@@ -543,7 +563,7 @@ export const autoExecuteSignal = api(
 // Get trading statistics
 export const getTradingStats = api(
   { method: "GET", path: "/trading/stats/:userId", expose: true },
-  async ({ userId }: { userId: string }): Promise<any> => {
+  async ({ userId }: { userId: string }): Promise<OrderSummary> => {
     try {
       const stats = await db.query`
         SELECT 

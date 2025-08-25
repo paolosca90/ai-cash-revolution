@@ -31,6 +31,14 @@ export interface AdaptiveLearning {
   optimizerType: string;
 }
 
+export interface ModelStats {
+  modelVersion: string;
+  currentEpoch: number;
+  trainingDataPoints: number;
+  lastAccuracy: number;
+  totalUpdates: number;
+}
+
 export class MLLearningEngine {
   private modelVersion = "v2.0";
   private currentEpoch = 0;
@@ -270,7 +278,7 @@ export class MLLearningEngine {
   /**
    * Get model statistics
    */
-  async getModelStats(): Promise<any> {
+  async getModelStats(): Promise<ModelStats> {
     try {
       const recentMetrics = await mlDB.query`
         SELECT * FROM ml_model_metrics 

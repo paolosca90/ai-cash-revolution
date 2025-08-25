@@ -45,6 +45,12 @@ export interface ModelEvaluationMetrics {
   generalization_error: number;
 }
 
+export interface PredictionPerformance {
+  accuracy: number;
+  precision: number;
+  recall: number;
+}
+
 export interface PerformanceAlert {
   id: string;
   level: 'INFO' | 'WARNING' | 'CRITICAL';
@@ -703,12 +709,12 @@ export class PerformanceMonitor {
     return Math.abs(accuracy - f1Score) + Math.random() * 0.1;
   }
   
-  private async getRecentPredictionPerformance(): Promise<any> {
+  private async getRecentPredictionPerformance(): Promise<PredictionPerformance> {
     // Placeholder for recent performance data
     return { accuracy: 0.72, precision: 0.68, recall: 0.75 };
   }
   
-  private async getHistoricalPredictionPerformance(): Promise<any> {
+  private async getHistoricalPredictionPerformance(): Promise<PredictionPerformance> {
     // Placeholder for historical performance data
     return { accuracy: 0.78, precision: 0.74, recall: 0.76 };
   }

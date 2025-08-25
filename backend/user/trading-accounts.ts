@@ -52,6 +52,32 @@ export interface TradingAccount {
   };
 }
 
+export interface TestConnectionResponse {
+  success: boolean;
+  message: string;
+  accountInfo: {
+    balance?: number;
+    currency?: string;
+    [key: string]: any;
+  } | null;
+  lastTestedAt: Date;
+}
+
+export interface TradingAccountDetails {
+  account: TradingAccount;
+  connectionStatus: {
+    isConnected: boolean;
+    lastTestResult?: string;
+    lastTestedAt?: Date;
+  };
+  accountStats?: {
+    balance: number;
+    equity: number;
+    margin?: number;
+    freeMargin?: number;
+  };
+}
+
 export interface AddTradingAccountRequest {
   userId: string;
   accountType: "MT4" | "MT5" | "BINANCE" | "BYBIT" | "COINBASE" | "ALPACA";
@@ -305,7 +331,7 @@ export const updateTradingAccount = api(
 // Test connection to trading account
 export const testConnection = api(
   { method: "POST", path: "/user/trading-accounts/:accountId/test", expose: true },
-  async (req: TestConnectionRequest): Promise<any> => {
+  async (req: TestConnectionRequest): Promise<TestConnectionResponse> => {
     try {
       // Get account details
       const accounts = await db.query`
@@ -413,7 +439,7 @@ export const testConnection = api(
 // Delete trading account
 export const deleteTradingAccount = api(
   { method: "DELETE", path: "/user/trading-accounts/:accountId", expose: true },
-  async ({ accountId, userId }: { accountId: string; userId: string }): Promise<any> => {
+  async ({ accountId, userId }: { accountId: string; userId: string }): Promise<TradingAccountDetails> => {
     try {
       // Verify account ownership
       const accounts = await db.query`
@@ -454,7 +480,7 @@ export const deleteTradingAccount = api(
 // Get account connection status
 export const getAccountStatus = api(
   { method: "GET", path: "/user/trading-accounts/:accountId/status", expose: true },
-  async ({ accountId, userId }: { accountId: string; userId: string }): Promise<any> => {
+  async ({ accountId, userId }: { accountId: string; userId: string }): Promise<TradingAccountDetails> => {
     try {
       const accounts = await db.query`
         SELECT id, account_name, account_type, is_connected, is_active, 
