@@ -6,7 +6,8 @@
     "dev": "tsx watch src/server.ts",
     "build": "echo 'Build completed - running in tsx mode'",
     "build-ts": "tsc",
-    "start": "tsx src/server.ts",
+    "start": "tsx src/simple-server.ts",
+    "start-full": "tsx src/server.ts",
     "db:migrate": "tsx src/database/migrate.ts"
   },
   "dependencies": {

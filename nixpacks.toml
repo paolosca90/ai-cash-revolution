@@ -11,4 +11,4 @@ cmds = ["npm ci --prefix backend"]
 cmds = ["npm run build --prefix backend"]
 
 [phases.start]
-cmd = "npm run db:migrate --prefix backend && npm start --prefix backend"
+cmd = "npm start --prefix backend"
