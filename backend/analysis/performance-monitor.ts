@@ -9,7 +9,7 @@
 import * as ss from 'simple-statistics';
 import { TradingStrategy } from './trading-strategies';
 import { QuantitativeMetrics } from './quantitative-strategy-optimizer';
-import { learningEngine } from '../ml/learning-engine';
+import { mlEngine } from '../ml/learning-engine';
 import { mlDB } from '../ml/db';
 import { analysisDB } from './db';
 

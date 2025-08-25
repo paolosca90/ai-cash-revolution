@@ -2,7 +2,7 @@ import { cron } from "encore.dev/cron";
 import { analysisDB } from "../analysis/db";
 import { generateSignalForSymbol } from "../analysis/signal-generator";
 import { recordSignalAnalytics, recordSignalPerformance } from "../analysis/analytics-tracker";
-import { learningEngine } from "../ml/learning-engine";
+import { mlEngine } from "../ml/learning-engine";
 // import { user } from "~encore/clients";
 
 // Simboli da analizzare automaticamente
@@ -244,7 +244,7 @@ async function simulateTradeClose(signal: any, holdingTimeMs: number) {
     if (Number(recentTrades?.count) >= 30) {
       console.log("🧠 Avvio riaddestramento modello ML...");
       try {
-        await learningEngine.trainModel();
+        await mlEngine.trainModel();
         console.log("✅ Modello ML riaddestrato con successo");
       } catch (mlError) {
         console.error("❌ Errore riaddestramento ML:", mlError);

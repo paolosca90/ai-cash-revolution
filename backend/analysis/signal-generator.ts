@@ -322,3 +322,33 @@ async function storeSignal(signal: TradingSignal): Promise<void> {
     )
   `;
 }
+
+// Helper function for generating signals that can be imported by other modules
+export async function generateSignalForSymbol(
+  symbol: string, 
+  mt5Config: any, 
+  tradeParams: any, 
+  strategy: string = "moderate"
+): Promise<TradingSignal> {
+  // Use a default timeframe for internal calls
+  const timeframe = "1h";
+  
+  // Get market data
+  const marketData = await getMarketData(symbol, timeframe);
+  
+  // Calculate technical indicators
+  const indicators = await calculateIndicators(marketData);
+  
+  // Use the specified strategy
+  const strategyConfig = TRADING_STRATEGIES[strategy] || TRADING_STRATEGIES["moderate"];
+  
+  // Generate signal using internal logic
+  const signal = await generateSignalInternal(
+    symbol,
+    marketData[marketData.length - 1].close, // Current price
+    indicators,
+    strategyConfig
+  );
+  
+  return signal;
+}

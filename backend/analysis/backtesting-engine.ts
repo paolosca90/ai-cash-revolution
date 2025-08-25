@@ -9,7 +9,7 @@
 import * as ss from 'simple-statistics';
 import { TradingStrategy, TRADING_STRATEGIES } from './trading-strategies';
 import { QuantitativeMetrics, quantitativeOptimizer } from './quantitative-strategy-optimizer';
-import { learningEngine } from '../ml/learning-engine';
+import { mlEngine } from '../ml/learning-engine';
 
 export interface BacktestConfig {
   startDate: Date;
@@ -330,7 +330,7 @@ export class BacktestingEngine {
         'volatility', 'skewness', 'hurst_exp', 'rsi_div', 'pv_corr', 'regime_prob'
       ];
       
-      const prediction = await learningEngine.predictWithModels(features, featureNames);
+      const prediction = await mlEngine.predictWithModels(features, featureNames);
       
       // Generate signal if confidence is sufficient
       if (prediction.confidence > 0.6) {

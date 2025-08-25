@@ -1,5 +1,5 @@
 import { api } from "encore.dev/api";
-import { learningEngine } from "./learning-engine";
+import { mlEngine } from "./learning-engine";
 
 interface TrainingRequest {
   modelName?: string;
@@ -33,10 +33,10 @@ export const trainModel = api<TrainingRequest, TrainingResponse>(
     
     try {
       // Train the model
-      const metrics = await learningEngine.trainModel();
+      const metrics = await mlEngine.trainModel();
       
       // Get recommendations
-      const recommendations = await learningEngine.getModelRecommendations();
+      const recommendations = await mlEngine.getModelRecommendations();
       
       const trainingTime = (Date.now() - startTime) / 1000;
       
@@ -76,7 +76,7 @@ export const detectPatterns = api<{ symbol: string }, { success: boolean; patter
       timestamp: Date.now()
     };
     
-    await learningEngine.detectMarketPatterns(symbol, mockMarketData);
+    await mlEngine.detectMarketPatterns(symbol, mockMarketData);
     
     // Simulate number of patterns detected
     const patternsDetected = Math.floor(Math.random() * 3) + 1;
@@ -98,7 +98,7 @@ export const getRecommendations = api<void, { recommendations: string[] }>(
     path: "/ml/recommendations"
   },
   async () => {
-    const recommendations = await learningEngine.getModelRecommendations();
+    const recommendations = await mlEngine.getModelRecommendations();
     
     return { recommendations };
   }

@@ -22,7 +22,7 @@ import {
   performInstitutionalAnalysis,
   InstitutionalAnalysis
 } from "./institutional-analysis";
-import { learningEngine } from "../ml/learning-engine";
+import { mlEngine } from "../ml/learning-engine";
 import { TradingStrategy } from "./trading-strategies";
 const geminiApiKey = secret("GeminiApiKey");
 
@@ -202,7 +202,7 @@ console.log(`🎯 Enhanced confidence: ${enhancedConfidence.finalConfidence.toFi
   
   // Apply adaptive learning adjustments
   let finalConfidence = enhancedConfidence.finalConfidence;
-  const adjustments = await learningEngine.getConfidenceAdjustments(symbol, marketContext.sessionType, strategy);
+  const adjustments = await mlEngine.getConfidenceAdjustments(symbol, marketContext.sessionType, strategy);
   if (adjustments.length > 0) {
     console.log(`🧠 Applying ${adjustments.length} adaptive learning adjustments...`);
     for (const adj of adjustments) {

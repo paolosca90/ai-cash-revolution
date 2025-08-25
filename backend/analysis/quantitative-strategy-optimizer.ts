@@ -8,7 +8,7 @@
 
 import * as ss from 'simple-statistics';
 import { TradingStrategy, TRADING_STRATEGIES, StrategyConfig } from './trading-strategies';
-import { learningEngine } from '../ml/learning-engine';
+import { mlEngine } from '../ml/learning-engine';
 
 export interface QuantitativeMetrics {
   sharpeRatio: number;
