@@ -42,7 +42,7 @@ interface GenerateSignalRequest {
   strategy?: string;
 }
 
-interface TradingSignal {
+export interface TradingSignal {
   symbol: string;
   action: "BUY" | "SELL" | "HOLD";
   confidence: number;
