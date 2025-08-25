@@ -215,7 +215,7 @@ router.post('/subscribe-oneclick', async (req, res) => {
 });
 
 // Crea VPS automaticamente con IONOS (priorità) o fallback
-async function createVPS(userId: number, userEmail: string, planType: 'basic' | 'premium' | 'enterprise', mt5Config: any) {
+export async function createVPS(userId: number, userEmail: string, planType: 'basic' | 'premium' | 'enterprise', mt5Config: any) {
   try {
     console.log(`🚀 Creando VPS per utente ${userId} con piano ${planType}...`);
     
@@ -400,8 +400,12 @@ async function configureVPSInBackground(instanceId: string, ipAddress: string, c
 
 // Placeholder functions
 async function processPayment(token: string, amount: number, email: string) {
-  // Integrazione Stripe/PayPal
-  return { success: true, payment_id: `pay_${Date.now()}` };
+  try {
+    // Integrazione Stripe/PayPal
+    return { success: true, payment_id: `pay_${Date.now()}` };
+  } catch (error: any) {
+    return { success: false, error: error.message };
+  }
 }
 
 async function sendWelcomeEmail(email: string, name: string, data: any) {
@@ -443,5 +447,4 @@ CREATE INDEX IF NOT EXISTS idx_vps_status ON client_vps_instances(status);
 `;
 
 // Export per Vercel function
-module.exports = router;
 export default router;

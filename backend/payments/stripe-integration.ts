@@ -3,6 +3,7 @@ import express from 'express';
 import Stripe from 'stripe';
 import { Pool } from 'pg';
 import bcrypt from 'bcrypt';
+import crypto from 'crypto';
 
 const router = express.Router();
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
@@ -396,7 +397,6 @@ async function handleSubscriptionCanceled(subscription: Stripe.Subscription) {
 
 // Helper functions
 function encrypt(text: string): string {
-  const crypto = require('crypto');
   const cipher = crypto.createCipher('aes-256-cbc', process.env.ENCRYPTION_KEY!);
   let encrypted = cipher.update(text, 'utf8', 'hex');
   encrypted += cipher.final('hex');
@@ -409,5 +409,4 @@ async function sendWelcomeEmail(email: string, name: string, data: any) {
 }
 
 // Export per Vercel function
-module.exports = router;
 export default router;
