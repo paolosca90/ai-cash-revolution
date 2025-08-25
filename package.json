@@ -1,6 +1,13 @@
 {
-  "name": "leap-app",
+  "name": "ai-money-generator",
   "version": "1.0.0",
-  "type": "module",
-  "packageManager": "bun"
+  "scripts": {
+    "dev": "cd backend && npm run dev",
+    "build": "cd backend && npm ci && npm run build",
+    "start": "cd backend && npm start",
+    "db:migrate": "cd backend && npm run db:migrate"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
 }
