@@ -10,8 +10,31 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// Set proper MIME types for JavaScript modules
+app.use('/assets', express.static(path.join(__dirname, 'frontend', 'dist', 'assets'), {
+    setHeaders: (res, path) => {
+        if (path.endsWith('.js')) {
+            res.setHeader('Content-Type', 'application/javascript');
+        } else if (path.endsWith('.mjs')) {
+            res.setHeader('Content-Type', 'application/javascript');
+        } else if (path.endsWith('.tsx') || path.endsWith('.ts')) {
+            res.setHeader('Content-Type', 'application/javascript');
+        }
+    }
+}));
+
 // Serve static files from frontend dist directory
-app.use(express.static(path.join(__dirname, 'frontend', 'dist')));
+app.use(express.static(path.join(__dirname, 'frontend', 'dist'), {
+    setHeaders: (res, path) => {
+        if (path.endsWith('.js')) {
+            res.setHeader('Content-Type', 'application/javascript');
+        } else if (path.endsWith('.mjs')) {
+            res.setHeader('Content-Type', 'application/javascript');
+        } else if (path.endsWith('.tsx')) {
+            res.setHeader('Content-Type', 'application/javascript');
+        }
+    }
+}));
 
 // Mock data for development
 const mockUsers = [

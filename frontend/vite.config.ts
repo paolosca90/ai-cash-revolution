@@ -14,8 +14,19 @@ export default defineConfig({
     tailwindcss(),
     react(),
   ],
-  mode: "development",
   build: {
-    minify: false,
+    outDir: 'dist',
+    assetsDir: 'assets',
+    minify: 'esbuild',
+    sourcemap: false,
+    rollupOptions: {
+      output: {
+        manualChunks: undefined,
+      },
+    },
+  },
+  server: {
+    port: 3000,
+    host: true,
   }
 })
