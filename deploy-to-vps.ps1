@@ -57,15 +57,14 @@ sudo -u postgres psql -c "CREATE DATABASE IF NOT EXISTS aicash_revolution;"
 sudo -u postgres psql -c "CREATE USER IF NOT EXISTS aicash WITH ENCRYPTED PASSWORD 'secure_password_2025!';"
 sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE aicash_revolution TO aicash;"
 
-# Install and build
-cd backend && sudo npm install --production
-cd ../frontend && sudo npm install && sudo npm run build
-sudo cp -r dist/* ../backend/dist/
+# Install dependencies and build frontend
+sudo npm install --production
+cd frontend && sudo npm install && sudo npm run build
 
 # Start with PM2
 cd /var/www/ai-cash-revolution
 sudo pm2 delete ai-cash-revolution 2>/dev/null || true
-cd backend && sudo pm2 start server.js --name "ai-cash-revolution"
+sudo pm2 start complete_server.js --name "ai-cash-revolution"
 sudo pm2 save
 sudo pm2 startup
 
@@ -96,4 +95,4 @@ Write-Host ""
 Write-Success "Your code is ready on GitHub!"
 Write-Success "Follow the manual steps above to complete the deployment."
 Write-Host ""
-Write-Host "🌐 After deployment, your app will be at: http://$VPS_IP:4000" -ForegroundColor Green
+Write-Host "🌐 After deployment, your app will be at: http://${VPS_IP}:4000" -ForegroundColor Green
