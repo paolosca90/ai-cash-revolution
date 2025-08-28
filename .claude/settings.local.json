@@ -1,0 +1,24 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(mkdir:*)",
+      "Bash(cat:*)",
+      "Bash(find:*)",
+      "Bash(encore run)",
+      "Bash(bun run:*)",
+      "Bash(bun install:*)",
+      "Bash(docker:*)",
+      "Bash(curl:*)",
+      "Bash(bunx vite:*)",
+      "Bash(pkill:*)",
+      "Bash(taskkill:*)",
+      "Bash(encore run:*)",
+      "Bash(set NODE_ENV=production)",
+      "Bash(npx tsc:*)",
+      "Bash(chmod:*)",
+      "Bash(git add:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
