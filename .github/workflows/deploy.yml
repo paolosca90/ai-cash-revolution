@@ -1,0 +1,45 @@
+name: Deploy to Production
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Install Bun
+      uses: oven-sh/setup-bun@v1
+      with:
+        bun-version: latest
+        
+    - name: Install Encore CLI
+      run: |
+        curl -L https://encore.dev/install.sh | bash
+        echo "$HOME/.encore/bin" >> $GITHUB_PATH
+        
+    - name: Verify Encore CLI installation
+      run: |
+        export PATH="$HOME/.encore/bin:$PATH"
+        encore version
+        
+    - name: Install root dependencies
+      run: bun install
+      
+    - name: Build application for production
+      run: |
+        cd backend
+        bun run build
+        
+    - name: Deploy to production
+      env:
+        ENCORE_AUTH_TOKEN: ${{ secrets.ENCORE_AUTH_TOKEN }}
+      run: |
+        export PATH="$HOME/.encore/bin:$PATH"
+        cd backend
+        encore deploy --env=production
