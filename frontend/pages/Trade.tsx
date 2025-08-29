@@ -8,7 +8,7 @@ import SignalCard from "../components/cards/SignalCard";
 import PositionsTable from "../components/tables/PositionsTable";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { TradingStrategy } from "~backend/analysis/trading-strategies";
+import { TradingStrategy } from "../types/trading";
 import { useLocation } from "react-router-dom";
 import { Sparkles, TrendingUp, Clock, Target } from "lucide-react";
 

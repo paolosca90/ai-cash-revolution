@@ -1,7 +1,7 @@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import type { MT5Position } from "~backend/analysis/mt5-bridge";
+import type { MT5Position } from "../../types/trading";
 
 interface PositionsTableProps {
   positions: MT5Position[];

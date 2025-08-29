@@ -8,7 +8,7 @@ import SignalCard from "./cards/SignalCard";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { TradingStrategy } from "~backend/analysis/trading-strategies";
+import { TradingStrategy } from "../types/trading";
 import { useLocation, useNavigate } from "react-router-dom";
 import { 
   Sparkles, 

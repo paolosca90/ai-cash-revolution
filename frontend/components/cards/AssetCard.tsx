@@ -2,7 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { TrendingUp, TrendingDown, Activity, Target } from "lucide-react";
-import type { AssetReliability } from "~backend/analysis/market-overview";
+import type { AssetReliability } from "../../types/trading";
 
 interface AssetCardProps {
   asset: AssetReliability;

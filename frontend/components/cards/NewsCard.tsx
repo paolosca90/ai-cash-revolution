@@ -1,7 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Clock, TrendingUp, TrendingDown, Minus } from "lucide-react";
-import type { MarketNews } from "~backend/analysis/market-overview";
+import type { MarketNews } from "../../types/trading";
 
 interface NewsCardProps {
   news: MarketNews;
