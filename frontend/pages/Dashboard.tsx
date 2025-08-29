@@ -1,91 +1,22 @@
-import React, { useMemo, useCallback, Suspense, lazy, useEffect, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useBackend } from "../hooks/useBackend";
 import StatCard from "../components/cards/StatCard";
 import AutoSignalCard from "../components/cards/AutoSignalCard";
-import MobileDashboard from "../components/MobileDashboard";
-import { DollarSign, Percent, TrendingUp, TrendingDown, Zap, BarChart, Brain, Target, Activity, AlertCircle, Award, Shield, Sparkles, RefreshCw, Clock, Database, Wifi, WifiOff } from "lucide-react";
+import { DollarSign, Percent, TrendingUp, TrendingDown, Zap, BarChart, Brain, Target, Activity, AlertCircle, Award, Shield, Sparkles, RefreshCw, Clock, Database } from "lucide-react";
+import PositionsTable from "../components/tables/PositionsTable";
+import HistoryTable from "../components/tables/HistoryTable";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/components/ui/use-toast";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart as RechartsBarChart, Bar } from 'recharts';
 import { useNavigate } from "react-router-dom";
-import { CardSkeleton, ChartSkeleton, SignalCardSkeleton } from "@/components/ui/skeleton";
-
-// Lazy load heavy components for better performance
-const PositionsTable = lazy(() => import("../components/tables/PositionsTable"));
-const HistoryTable = lazy(() => import("../components/tables/HistoryTable"));
-
-// Custom hook for connection status
-function useConnectionStatus() {
-  const [isOnline, setIsOnline] = React.useState(navigator.onLine);
-  
-  React.useEffect(() => {
-    const handleOnline = () => setIsOnline(true);
-    const handleOffline = () => setIsOnline(false);
-    
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
-    
-    return () => {
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
-    };
-  }, []);
-  
-  return isOnline;
-}
-
-// Custom hook for responsive breakpoints
-function useResponsiveBreakpoint() {
-  const [breakpoint, setBreakpoint] = React.useState<'sm' | 'md' | 'lg' | 'xl'>('lg');
-  
-  React.useEffect(() => {
-    const updateBreakpoint = () => {
-      const width = window.innerWidth;
-      if (width < 640) setBreakpoint('sm');
-      else if (width < 768) setBreakpoint('md');
-      else if (width < 1024) setBreakpoint('lg');
-      else setBreakpoint('xl');
-    };
-    
-    updateBreakpoint();
-    window.addEventListener('resize', updateBreakpoint);
-    return () => window.removeEventListener('resize', updateBreakpoint);
-  }, []);
-  
-  return breakpoint;
-}
-
-// Custom hook to detect mobile device
-function useIsMobile() {
-  const [isMobile, setIsMobile] = useState(false);
-
-  useEffect(() => {
-    const checkIsMobile = () => {
-      setIsMobile(window.innerWidth < 768);
-    };
-    
-    checkIsMobile();
-    window.addEventListener('resize', checkIsMobile);
-    return () => window.removeEventListener('resize', checkIsMobile);
-  }, []);
-
-  return isMobile;
-}
 
 export default function Dashboard() {
   const backend = useBackend();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
-  const isMobile = useIsMobile();
-
-  // If mobile, render the mobile-optimized dashboard
-  if (isMobile) {
-    return <MobileDashboard />;
-  }
 
   const { data: topSignalsData, isLoading: isLoadingTopSignals, error: topSignalsError, refetch: refetchTopSignals } = useQuery({
     queryKey: ["topSignals"],

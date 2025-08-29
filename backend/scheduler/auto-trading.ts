@@ -2,8 +2,8 @@ import { cron } from "encore.dev/cron";
 import { analysisDB } from "../analysis/db";
 import { generateSignalForSymbol } from "../analysis/signal-generator";
 import { recordSignalAnalytics, recordSignalPerformance } from "../analysis/analytics-tracker";
-import { mlEngine } from "../ml/learning-engine";
-// import { user } from "~encore/clients";
+import { learningEngine } from "../ml/learning-engine";
+import { getUnifiedTradingConfig } from "../analysis/config-helper";
 
 // Simboli da analizzare automaticamente
 const AUTO_TRADING_SYMBOLS = [
@@ -20,19 +20,7 @@ export const generateAutoSignals = cron("generate-auto-signals", {
     console.log("🤖 Avvio generazione automatica segnali...");
 
     try {
-      // Use demo MT5 configuration and user preferences
-      const mt5Config = {
-        userId: 1,
-        host: "154.61.187.189",
-        port: 8080,
-        login: "6001637",
-        server: "PureMGlobal-MT5",
-      };
-
-      const tradeParams = {
-        accountBalance: 9518.40,
-        riskPercentage: 2.0
-      };
+      const { mt5Config, tradeParams } = await getUnifiedTradingConfig();
 
       const signals = [];
       const startTime = Date.now();
@@ -244,7 +232,7 @@ async function simulateTradeClose(signal: any, holdingTimeMs: number) {
     if (Number(recentTrades?.count) >= 30) {
       console.log("🧠 Avvio riaddestramento modello ML...");
       try {
-        await mlEngine.trainModel();
+        await learningEngine.trainModel();
         console.log("✅ Modello ML riaddestrato con successo");
       } catch (mlError) {
         console.error("❌ Errore riaddestramento ML:", mlError);
@@ -489,20 +477,6 @@ export const ensureVisibleSignals = cron("ensure-visible-signals", {
   every: "5m",
   handler: async () => {
     try {
-      // Use demo MT5 configuration and user preferences
-      const mt5Config = {
-        userId: 1,
-        host: "154.61.187.189",
-        port: 8080,
-        login: "6001637",
-        server: "PureMGlobal-MT5",
-      };
-
-      const tradeParams = {
-        accountBalance: 9518.40,
-        riskPercentage: 2.0
-      };
-
       // Controlla se ci sono segnali recenti visibili
       const recentSignals = await analysisDB.queryRow`
         SELECT COUNT(*) as count 
@@ -515,6 +489,8 @@ export const ensureVisibleSignals = cron("ensure-visible-signals", {
       
       if (signalCount < 3) {
         console.log(`🔄 Solo ${signalCount} segnali recenti trovati, generando segnali aggiuntivi...`);
+        
+        const { mt5Config, tradeParams } = await getUnifiedTradingConfig();
         
         // Genera alcuni segnali per i simboli più popolari
         const popularSymbols = ["EURUSD", "BTCUSD", "US30"];

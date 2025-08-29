@@ -6,7 +6,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/components/ui/use-toast";
 import SignalCard from "../components/cards/SignalCard";
 import PositionsTable from "../components/tables/PositionsTable";
-import MobileTradePage from "../components/MobileTradePage";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { TradingStrategy } from "~backend/analysis/trading-strategies";
@@ -66,23 +65,6 @@ const strategyDescriptions = {
   }
 };
 
-// Hook to detect mobile device
-function useIsMobile() {
-  const [isMobile, setIsMobile] = useState(false);
-
-  useEffect(() => {
-    const checkIsMobile = () => {
-      setIsMobile(window.innerWidth < 768);
-    };
-    
-    checkIsMobile();
-    window.addEventListener('resize', checkIsMobile);
-    return () => window.removeEventListener('resize', checkIsMobile);
-  }, []);
-
-  return isMobile;
-}
-
 export default function Trade() {
   const location = useLocation();
   const [symbol, setSymbol] = useState("US30");
@@ -90,12 +72,6 @@ export default function Trade() {
   const backend = useBackend();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const isMobile = useIsMobile();
-
-  // If mobile, render the mobile-optimized trade page
-  if (isMobile) {
-    return <MobileTradePage />;
-  }
 
   // Check if a symbol was passed from navigation
   useEffect(() => {

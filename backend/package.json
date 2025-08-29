@@ -1,39 +1,19 @@
 {
-  "name": "trading-bot-backend",
+  "name": "backend",
   "version": "1.0.0",
   "type": "module",
+  "packageManager": "bun",
+  "workspaces": [
+    "data_enrichment"
+  ],
   "scripts": {
-    "dev": "tsx watch src/server.ts",
-    "build": "echo 'Build completed - running in tsx mode'",
-    "build-ts": "tsc",
-    "start": "tsx src/simple-server.ts",
-    "start-full": "tsx src/server.ts",
-    "db:migrate": "tsx src/database/migrate.ts"
+    "build": "cd ../frontend && bun install && vite build --outDir=../backend/frontend/dist"
   },
   "dependencies": {
-    "@types/stripe": "^8.0.416",
-    "@vercel/node": "^5.3.13",
-    "bcrypt": "^5.1.0",
-    "cors": "^2.8.5",
-    "dotenv": "^16.3.1",
-    "express": "^4.18.2",
-    "helmet": "^7.1.0",
-    "jsonwebtoken": "^9.0.0",
-    "pg": "^8.11.3",
-    "simple-statistics": "^7.8.3",
-    "stripe": "^18.4.0",
-    "technicalindicators": "^3.1.0",
-    "tsx": "^4.7.0",
-    "zod": "^3.22.4"
+    "encore.dev": "^1.49.1",
+    "node-fetch": "^3.3.2"
   },
   "devDependencies": {
-    "@types/bcrypt": "^5.0.0",
-    "@types/cors": "^2.8.17",
-    "@types/express": "^4.17.21",
-    "@types/jsonwebtoken": "^9.0.0",
-    "@types/node": "^22.0.0",
-    "@types/pg": "^8.10.9",
-    "tsx": "^4.7.0",
     "typescript": "^5.9.2"
   }
 }

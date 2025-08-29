@@ -1,10 +1,10 @@
 /**
  * Institutional Trading Analysis Module (v2.0)
- * * Implementa concetti avanzati di trading istituzionale (Market Structure, BOS/CHOCH, Order Blocks)
- * per migliorare drasticamente la qualità dei segnali.
+ * Implements advanced institutional trading concepts (Market Structure, BOS/CHOCH, Order Blocks)
+ * to drastically improve signal quality.
  */
 
-// --- INTERFACCE POTENZIATE ---
+// --- ENHANCED INTERFACES ---
 
 export interface OrderBlock {
   id: string;
@@ -16,7 +16,7 @@ export interface OrderBlock {
   timestamp: number;
   strength: "WEAK" | "MODERATE" | "STRONG" | "EXTREME";
   status: "FRESH" | "TESTED" | "BROKEN";
-  distance: number; // Distanza dal prezzo corrente
+  distance: number; // Distance from current price
 }
 
 export interface FairValueGap {
@@ -39,7 +39,7 @@ export interface StructurePoint {
 
 export interface MarketStructure {
   trend: "UPTREND" | "DOWNTREND" | "RANGING";
-  bias: "BULLISH" | "BEARISH" | "NEUTRAL"; // Il "pregiudizio" direzionale basato sulla struttura recente
+  bias: "BULLISH" | "BEARISH" | "NEUTRAL"; // The directional "bias" based on recent structure
   lastBOS: { type: "BULLISH" | "BEARISH"; price: number; timestamp: number } | null;
   lastCHOCH: { type: "BULLISH" | "BEARISH"; price: number; timestamp: number } | null;
   swingHighs: { price: number; timestamp: number }[];
@@ -109,11 +109,11 @@ export interface InstitutionalAnalysis {
 }
 
 
-// --- NUOVE FUNZIONI DI ANALISI STRUTTURALE (SOSTITUZIONE) ---
+// --- NEW STRUCTURAL ANALYSIS FUNCTIONS (REPLACEMENT) ---
 
 /**
- * Identifica gli Swing Highs (massimi di swing) in una serie di candele.
- * Uno swing high è un massimo locale più alto delle candele circostanti.
+ * Identifies Swing Highs in a series of candles.
+ * A swing high is a local maximum higher than the surrounding candles.
  */
 export function identifySwingHighs(candles: Array<{high: number, timestamp: number}>, lookback: number = 5): { price: number; timestamp: number }[] {
   const swingHighs: { price: number; timestamp: number }[] = [];
@@ -136,8 +136,8 @@ export function identifySwingHighs(candles: Array<{high: number, timestamp: numb
 }
 
 /**
- * Identifica gli Swing Lows (minimi di swing) in una serie di candele.
- * Uno swing low è un minimo locale più basso delle candele circostanti.
+ * Identifies Swing Lows in a series of candles.
+ * A swing low is a local minimum lower than the surrounding candles.
  */
 export function identifySwingLows(candles: Array<{low: number, timestamp: number}>, lookback: number = 5): { price: number; timestamp: number }[] {
   const swingLows: { price: number; timestamp: number }[] = [];
@@ -160,7 +160,7 @@ export function identifySwingLows(candles: Array<{low: number, timestamp: number
 }
 
 /**
- * Analizza e ordina i punti di swing per creare una sequenza strutturale.
+ * Analyzes and sorts swing points to create a structural sequence.
  */
 function getStructurePoints(swingHighs: { price: number; timestamp: number }[], swingLows: { price: number; timestamp: number }[]): { price: number; timestamp: number; isHigh: boolean }[] {
     const combined = [
@@ -171,7 +171,7 @@ function getStructurePoints(swingHighs: { price: number; timestamp: number }[], 
 }
 
 /**
- * Analizza la sequenza di punti di swing per identificare HH, HL, LH, LL e i Break of Structure (BOS) / Change of Character (CHOCH).
+ * Analyzes the sequence of swing points to identify HH, HL, LH, LL and Break of Structure (BOS) / Change of Character (CHOCH).
  */
 function analyzeStructuralSequence(points: { price: number; timestamp: number; isHigh: boolean }[]): { structurePoints: StructurePoint[], lastBOS: MarketStructure['lastBOS'], lastCHOCH: MarketStructure['lastCHOCH'] } {
     const structurePoints: StructurePoint[] = [];
@@ -184,7 +184,7 @@ function analyzeStructuralSequence(points: { price: number; timestamp: number; i
         const prev = points[i-1];
         const current = points[i];
 
-        // Se abbiamo due massimi o due minimi consecutivi, ignoriamo il meno significativo
+        // If we have two consecutive highs or lows, ignore the less significant one
         if (prev.isHigh === current.isHigh) continue;
 
         let type: StructurePoint['type'] | null = null;
@@ -195,7 +195,7 @@ function analyzeStructuralSequence(points: { price: number; timestamp: number; i
         }
         structurePoints.push({ type, price: current.price, timestamp: current.timestamp });
 
-        // Identificazione BOS e CHOCH
+        // BOS and CHOCH identification
         const lastHigh = findLastPoint(structurePoints, p => p.type === "HH" || p.type === "LH", structurePoints.length - 2);
         const lastLow = findLastPoint(structurePoints, p => p.type === "LL" || p.type === "HL", structurePoints.length - 2);
 
@@ -226,7 +226,7 @@ function findLastPoint(points: StructurePoint[], filter: (p: StructurePoint) => 
 }
 
 /**
- * Determina il trend e il bias basandosi sulla sequenza strutturale.
+ * Determines the trend and bias based on the structural sequence.
  */
 function determineTrendAndBias(points: StructurePoint[]): { trend: MarketStructure['trend'], bias: MarketStructure['bias'] } {
     if (points.length < 3) return { trend: "RANGING", bias: "NEUTRAL" };
@@ -246,7 +246,7 @@ function determineTrendAndBias(points: StructurePoint[]): { trend: MarketStructu
         return { trend: "DOWNTREND", bias: "BEARISH" };
     }
 
-    // Se l'ultimo punto è un massimo più alto (HH) o un minimo più alto (HL), il bias è bullish
+    // If the last point is a higher high (HH) or a higher low (HL), the bias is bullish
     const lastPoint = points[points.length - 1];
     if(lastPoint.type === 'HH' || lastPoint.type === 'HL') return { trend: "RANGING", bias: "BULLISH" };
     if(lastPoint.type === 'LL' || lastPoint.type === 'LH') return { trend: "RANGING", bias: "BEARISH" };
@@ -256,7 +256,7 @@ function determineTrendAndBias(points: StructurePoint[]): { trend: MarketStructu
 
 
 /**
- * Funzione principale che orchestra l'analisi della struttura di mercato.
+ * Main function that orchestrates the market structure analysis.
  */
 export function analyzeMarketStructure(
   candles: Array<{high: number, low: number, open: number, close: number, volume: number, timestamp: number}>
@@ -269,7 +269,7 @@ export function analyzeMarketStructure(
   const { trend, bias } = determineTrendAndBias(structurePoints);
 
   const keyLevels = [...swingHighs.map(s => s.price), ...swingLows.map(s => s.price)]
-                      .filter((v, i, a) => a.indexOf(v) === i) // Unici
+                      .filter((v, i, a) => a.indexOf(v) === i) // Unique
                       .sort((a, b) => a - b);
 
   return {
@@ -285,7 +285,7 @@ export function analyzeMarketStructure(
 }
 
 
-// --- FUNZIONI ESISTENTI (NON MODIFICATE IN QUESTO STEP) ---
+// --- EXISTING FUNCTIONS (NOT MODIFIED IN THIS STEP) ---
 
 /**
  * Identify Order Blocks based on institutional order flow patterns

@@ -14,16 +14,14 @@ import {
   calculateEnhancedConfidence,
   EnhancedConfidenceResult
 } from "./enhanced-confidence-system";
-import { advancedFeatureEngine } from "./advanced-feature-engine";
-import { quantitativeOptimizer } from "./quantitative-strategy-optimizer";
-import { advancedRiskManager } from "./advanced-risk-manager";
-import { performanceMonitor } from "./performance-monitor";
 import {
   performInstitutionalAnalysis,
   InstitutionalAnalysis
 } from "./institutional-analysis";
-import { mlEngine } from "../ml/learning-engine";
+import { learningEngine } from "../ml/learning-engine";
 import { TradingStrategy } from "./trading-strategies";
+import { EnhancedFeatureExtractor, AdvancedFeatures } from "../ml/enhanced-features";
+import { tradingEnsemble, EnsembleResult } from "../ml/ensemble-models";
 const geminiApiKey = secret("GeminiApiKey");
 
 export interface AIAnalysis {
@@ -76,6 +74,10 @@ export interface AIAnalysis {
     analysis: any;
     signals: any;
   };
+  // NEW: Advanced ML components
+  advancedFeatures: AdvancedFeatures;
+  ensembleResult: EnsembleResult;
+  mlEnhancedConfidence: number;
 }
 
 // Cache for Gemini responses to reduce API calls
@@ -134,13 +136,29 @@ export async function analyzeWithAI(marketData: TimeframeData, symbol: string, s
   // Enhanced sentiment analysis using real news
   const sentimentAnalysis = await analyzeSentiment(symbol);
 
+  // NEW: Extract advanced ML features
+  console.log(`🧠 Extracting advanced features for ML analysis...`);
+  const advancedFeatures = EnhancedFeatureExtractor.extractAdvancedFeatures(
+    marketData, 
+    symbol, 
+    [] // TODO: Add correlated assets data
+  );
+  console.log(`✅ Advanced features extracted. Regime: ${advancedFeatures.regime.trend_regime}/${advancedFeatures.regime.volatility_regime}`);
+
+  // NEW: Generate ensemble prediction
+  console.log(`🤖 Running ensemble model prediction...`);
+  const ensembleResult = await tradingEnsemble.predict(marketData, advancedFeatures, symbol);
+  console.log(`🎯 Ensemble prediction: ${ensembleResult.finalDirection} (${ensembleResult.ensembleConfidence.toFixed(1)}% confidence, ${(ensembleResult.modelAgreement * 100).toFixed(0)}% agreement)`);
+
   // Use Gemini AI for enhanced analysis with better error handling and caching
   const geminiAnalysis = await analyzeWithGeminiCached(marketData, symbol, {
     priceAction: priceActionAnalysis,
     smartMoney: smartMoneyAnalysis,
     volume: volumeAnalysis,
     professional: professionalAnalysis,
-    vwap: vwapAnalysis
+    vwap: vwapAnalysis,
+    advancedFeatures: advancedFeatures,
+    ensembleResult: ensembleResult
   });
 
   // Calculate enhanced support and resistance using multiple methods
@@ -161,7 +179,15 @@ export async function analyzeWithAI(marketData: TimeframeData, symbol: string, s
     multiTimeframeAnalysis, traditionalDirection
   );
 
-  console.log(`📍 Traditional direction: ${traditionalDirection}, Enhanced direction: ${enhancedDirection}`);
+  // NEW: ML-enhanced direction with ensemble input
+  const mlEnhancedDirection = determineFinalMLDirection(
+    enhancedDirection,
+    ensembleResult,
+    advancedFeatures,
+    multiTimeframeAnalysis
+  );
+
+  console.log(`📍 Traditional: ${traditionalDirection}, Enhanced: ${enhancedDirection}, ML-Enhanced: ${mlEnhancedDirection}`);
 
   // ========== INSTITUTIONAL ANALYSIS ==========
   // Perform comprehensive institutional analysis
@@ -183,26 +209,33 @@ export async function analyzeWithAI(marketData: TimeframeData, symbol: string, s
     geminiAnalysis
   );
 
-  // Calculate enhanced confidence with sophisticated scoring (now async)
-  const enhancedConfidence = await calculateEnhancedConfidence(
+  // Calculate enhanced confidence with sophisticated scoring
+  const enhancedConfidence = calculateEnhancedConfidence(
     indicators5m,
     indicators15m, 
     indicators30m,
     multiTimeframeAnalysis,
     marketContext,
-    enhancedDirection,
+    mlEnhancedDirection, // Use ML-enhanced direction
     symbol,
-    marketData, // Pass market data for advanced features
     undefined, // historicalWinRate
     institutionalAnalysis // Pass institutional analysis
   );
 
-console.log(`🎯 Enhanced confidence: ${enhancedConfidence.finalConfidence.toFixed(1)}% (Grade: ${enhancedConfidence.confidenceGrade})`);
+  // NEW: Calculate ML-enhanced confidence using ensemble
+  const mlEnhancedConfidence = calculateMLEnhancedConfidence(
+    enhancedConfidence,
+    ensembleResult,
+    advancedFeatures
+  );
+
+  console.log(`🎯 Enhanced confidence: ${enhancedConfidence.finalConfidence.toFixed(1)}% (Grade: ${enhancedConfidence.confidenceGrade})`);
   console.log(`🏛️ Institutional score: ${enhancedConfidence.institutionalScore.toFixed(1)}%`);
+  console.log(`🤖 ML-Enhanced confidence: ${mlEnhancedConfidence.toFixed(1)}% (Ensemble agreement: ${(ensembleResult.modelAgreement * 100).toFixed(0)}%)`);
   
   // Apply adaptive learning adjustments
-  let finalConfidence = enhancedConfidence.finalConfidence;
-  const adjustments = await mlEngine.getConfidenceAdjustments(symbol, marketContext.sessionType, strategy);
+  let finalConfidence = mlEnhancedConfidence;
+  const adjustments = await learningEngine.getConfidenceAdjustments(symbol, marketContext.sessionType, strategy);
   if (adjustments.length > 0) {
     console.log(`🧠 Applying ${adjustments.length} adaptive learning adjustments...`);
     for (const adj of adjustments) {
@@ -235,7 +268,7 @@ console.log(`🎯 Enhanced confidence: ${enhancedConfidence.finalConfidence.toFi
   console.log(`✅ Enhanced AI analysis completed for ${symbol}`);
 
   return {
-    direction: enhancedDirection,
+    direction: mlEnhancedDirection, // Use ML-enhanced direction
     confidence: finalConfidence,
     enhancedConfidence, // Include full enhanced confidence result
     institutionalAnalysis, // Include comprehensive institutional analysis
@@ -262,6 +295,10 @@ console.log(`🎯 Enhanced confidence: ${enhancedConfidence.finalConfidence.toFi
       analysis: vwapAnalysis,
       signals: vwapSignals
     },
+    // NEW: Advanced ML components
+    advancedFeatures,
+    ensembleResult,
+    mlEnhancedConfidence
   };
 }
 
@@ -1258,4 +1295,106 @@ function determineEnhancedDirection(
   console.log(`🎯 Enhanced direction analysis: BULL ${bullishScore} vs BEAR ${bearishScore} = ${enhancedDirection}`);
   
   return enhancedDirection;
+}
+
+/**
+ * NEW: Determine final ML-enhanced direction using ensemble input
+ */
+function determineFinalMLDirection(
+  enhancedDirection: "LONG" | "SHORT",
+  ensembleResult: EnsembleResult,
+  advancedFeatures: AdvancedFeatures,
+  multiTimeframeAnalysis: MultiTimeframeAnalysis
+): "LONG" | "SHORT" {
+  
+  // If ensemble has high agreement and good confidence, prefer ensemble
+  if (ensembleResult.modelAgreement > 0.75 && ensembleResult.ensembleConfidence > 75) {
+    console.log(`🤖 High ensemble agreement (${(ensembleResult.modelAgreement * 100).toFixed(0)}%) - using ensemble direction: ${ensembleResult.finalDirection}`);
+    return ensembleResult.finalDirection;
+  }
+  
+  // If traditional and ensemble agree, high confidence
+  if (enhancedDirection === ensembleResult.finalDirection) {
+    console.log(`✅ Traditional and ensemble align on ${enhancedDirection} - high confidence`);
+    return enhancedDirection;
+  }
+  
+  // Conflict resolution based on market regime
+  console.log(`⚡ Direction conflict: Traditional ${enhancedDirection} vs Ensemble ${ensembleResult.finalDirection}`);
+  
+  // Prefer ensemble in strong trending markets
+  if (advancedFeatures.regime.trend_regime === "TRENDING" && 
+      multiTimeframeAnalysis.trendAlignment.includes("STRONG")) {
+    console.log(`📈 Strong trending market - preferring ensemble direction: ${ensembleResult.finalDirection}`);
+    return ensembleResult.finalDirection;
+  }
+  
+  // Prefer traditional analysis in ranging markets
+  if (advancedFeatures.regime.trend_regime === "RANGING") {
+    console.log(`📊 Ranging market - preferring traditional analysis: ${enhancedDirection}`);
+    return enhancedDirection;
+  }
+  
+  // Default to direction with higher confidence
+  if (ensembleResult.ensembleConfidence > 70) {
+    console.log(`🎯 Higher ensemble confidence - using: ${ensembleResult.finalDirection}`);
+    return ensembleResult.finalDirection;
+  }
+  
+  console.log(`🔄 Default to enhanced technical analysis: ${enhancedDirection}`);
+  return enhancedDirection;
+}
+
+/**
+ * NEW: Calculate ML-enhanced confidence using ensemble metrics
+ */
+function calculateMLEnhancedConfidence(
+  enhancedConfidence: any,
+  ensembleResult: EnsembleResult,
+  advancedFeatures: AdvancedFeatures
+): number {
+  
+  let baseConfidence = enhancedConfidence.finalConfidence;
+  
+  // Ensemble agreement boost
+  const agreementBoost = (ensembleResult.modelAgreement - 0.5) * 20; // -10 to +10
+  baseConfidence += agreementBoost;
+  
+  // Diversity penalty (too little diversity is bad)
+  const diversityPenalty = ensembleResult.diversityScore < 0.2 ? -5 : 0;
+  baseConfidence += diversityPenalty;
+  
+  // Uncertainty penalty
+  const uncertaintyPenalty = ensembleResult.uncertaintyEstimate * -15;
+  baseConfidence += uncertaintyPenalty;
+  
+  // Regime-based adjustments
+  switch (advancedFeatures.regime.volatility_regime) {
+    case "CRISIS":
+      baseConfidence *= 0.8; // Reduce confidence in crisis
+      break;
+    case "HIGH":
+      baseConfidence *= 0.9; // Slight reduction in high volatility
+      break;
+    case "NORMAL":
+      baseConfidence *= 1.05; // Slight boost in normal conditions
+      break;
+    case "LOW":
+      baseConfidence *= 0.95; // Slight reduction in low volatility
+      break;
+  }
+  
+  // Session effect
+  baseConfidence += (advancedFeatures.temporal.session_effect - 0.5) * 10;
+  
+  // Feature quality boost
+  const featureQualityScore = (
+    Math.abs(advancedFeatures.technical.rsi_momentum) +
+    Math.abs(advancedFeatures.technical.macd_divergence) +
+    Math.abs(advancedFeatures.microstructure.order_flow_imbalance)
+  ) / 3;
+  baseConfidence += featureQualityScore * 5;
+  
+  // Ensure bounds
+  return Math.min(98, Math.max(20, baseConfidence));
 }

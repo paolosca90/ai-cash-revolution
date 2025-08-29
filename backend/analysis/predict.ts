@@ -2,33 +2,13 @@ import { api, APIError } from "encore.dev/api";
 import { analysisDB } from "./db";
 import { TradingStrategy } from "./trading-strategies";
 import { TradingSignal, generateSignalForSymbol } from "./signal-generator";
-// import { user } from "~encore/clients";
+import { getUnifiedTradingConfig } from "./config-helper";
 
 interface PredictRequest {
   symbol: string;
   strategy?: TradingStrategy;
 }
 
-export interface TradingSignal {
-  tradeId: string;
-  symbol: string;
-  direction: "LONG" | "SHORT";
-  strategy: TradingStrategy;
-  entryPrice: number;
-  takeProfit: number;
-  stopLoss: number;
-  confidence: number;
-  riskRewardRatio: number;
-  recommendedLotSize: number;
-  maxHoldingTime: number;
-  expiresAt: Date;
-  chartUrl?: string;
-  strategyRecommendation: string;
-  analysis: any;
-  // NEW: Enhanced institutional analysis
-  institutionalAnalysis?: any; // Will contain InstitutionalAnalysis data
-  enhancedConfidence?: any; // Will contain EnhancedConfidenceResult data
-}
 // Generates AI-powered trading predictions with automatic NY session closure.
 export const predict = api<PredictRequest, TradingSignal>(
   { 
@@ -44,19 +24,7 @@ export const predict = api<PredictRequest, TradingSignal>(
     }
 
     try {
-      // Use demo MT5 configuration and user preferences
-      const mt5Config = {
-        userId: 1,
-        host: "154.61.187.189",
-        port: 8080,
-        login: "6001637",
-        server: "PureMGlobal-MT5",
-      };
-
-      const tradeParams = {
-        accountBalance: 9518.40,
-        riskPercentage: 2.0
-      };
+      const { mt5Config, tradeParams } = await getUnifiedTradingConfig();
 
       const signal = await generateSignalForSymbol(symbol, mt5Config, tradeParams, userStrategy);
 
@@ -85,7 +53,8 @@ export const predict = api<PredictRequest, TradingSignal>(
     } catch (error) {
       console.error(`Error generating prediction for ${symbol}:`, error);
       if (error && typeof error === 'object' && 'code' in error) throw error;
-      throw APIError.internal(`Failed to generate trading signal for ${symbol}.`);
+      const errorMessage = error instanceof Error ? error.message : `Failed to generate trading signal for ${symbol}.`;
+      throw APIError.internal(errorMessage);
     }
   }
 );

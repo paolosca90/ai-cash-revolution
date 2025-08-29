@@ -1,6 +1,6 @@
 import { api, APIError } from "encore.dev/api";
 import { analysisDB } from "./db";
-// import { user } from "~encore/clients";
+import { user } from "~encore/clients";
 
 // A simplified signal for the dashboard based on real auto-generated signals
 export interface AutoSignal {
@@ -291,18 +291,17 @@ export const forceSignalGeneration = api<void, { success: boolean; message: stri
     try {
       console.log("🔄 Forzando generazione di nuovi segnali...");
       
-      // Use demo MT5 configuration and user preferences
-      const mt5Config = {
-        userId: 1,
-        host: "154.61.187.189",
-        port: 8080,
-        login: "6001637",
-        server: "PureMGlobal-MT5",
-      };
+      // Fetch config from the single source of truth
+      const { config: mt5Config } = await user.getMt5Config();
+      const { preferences } = await user.getPreferences();
+
+      if (!mt5Config || !preferences) {
+        throw APIError.failedPrecondition("MT5 configuration or user preferences are not set up.");
+      }
 
       const tradeParams = {
-        accountBalance: 9518.40,
-        riskPercentage: 2.0
+        accountBalance: preferences.accountBalance,
+        riskPercentage: preferences.riskPercentage
       };
       
       const { generateSignalForSymbol } = await import("./signal-generator");

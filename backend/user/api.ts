@@ -96,8 +96,7 @@ export const getSubscription = api<void, { subscription: Subscription | null }>(
   path: "/user/subscription",
   expose: true,
 }, async () => {
-  // In a real implementation, this would fetch from the billing service
-  // For demo purposes, return a basic subscription
+  // Return demo subscription
   const subscription: Subscription = {
     userId: 1,
     plan: "free",
