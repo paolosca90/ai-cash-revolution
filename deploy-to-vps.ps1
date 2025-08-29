@@ -1,10 +1,11 @@
 # AI Cash R-evolution - Windows PowerShell Deploy Script
 # Run this from PowerShell to deploy everything automatically
 
-# Configuration
-$VPS_IP = "154.61.187.189"
-$VPS_USER = "Administrator"  
-$SSH_PORT = "8467"
+# Configuration - Updated for Ubuntu VPS
+$VPS_IP = "188.34.181.99"
+$VPS_USER = "root"  
+$SSH_PORT = "22"
+$VPS_PASSWORD = "3gCifhcmNkac"
 $DOMAIN = "ai.cash-revolution.com"
 
 Write-Host "🚀 AI Cash R-evolution - Auto Deploy to VPS" -ForegroundColor Green
@@ -75,11 +76,9 @@ Write-Status "Deployment commands prepared"
 Write-Host ""
 Write-Host "🔧 MANUAL STEPS REQUIRED:" -ForegroundColor Yellow
 Write-Host ""
-Write-Host "1. Connect to your VPS using Remote Desktop or SSH:" -ForegroundColor White
-Write-Host "   IP: $VPS_IP" -ForegroundColor Cyan
-Write-Host "   Port: $SSH_PORT" -ForegroundColor Cyan  
-Write-Host "   User: $VPS_USER" -ForegroundColor Cyan
-Write-Host "   Password: d7Y*8R9cX9Qy" -ForegroundColor Cyan
+Write-Host "1. Connect to your Ubuntu VPS via SSH:" -ForegroundColor White
+Write-Host "   ssh $VPS_USER@$VPS_IP" -ForegroundColor Cyan
+Write-Host "   Password: $VPS_PASSWORD" -ForegroundColor Cyan
 Write-Host ""
 Write-Host "2. Open terminal/command prompt on VPS and run these commands:" -ForegroundColor White
 Write-Host ""
@@ -95,4 +94,4 @@ Write-Host ""
 Write-Success "Your code is ready on GitHub!"
 Write-Success "Follow the manual steps above to complete the deployment."
 Write-Host ""
-Write-Host "🌐 After deployment, your app will be at: http://${VPS_IP}:4000" -ForegroundColor Green
+Write-Host "🌐 After deployment, your app will be at: http://${VPS_IP}" -ForegroundColor Green
