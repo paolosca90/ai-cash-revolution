@@ -1,57 +1,102 @@
-import { mlDB } from "./db";
-import { analysisDB } from "../analysis/db";
+// ========================================
+// 🧠 MOTORE DI MACHINE LEARNING - APPRENDIMENTO ADATTIVO
+// ========================================
+// Questo modulo implementa un sistema di ML che impara dai trade passati
+// e migliora continuamente le prestazioni del sistema AI di trading
 
+// Connessioni ai database
+import { mlDB } from "./db";                    // Database ML (metriche, modelli, pattern)
+import { analysisDB } from "../analysis/db";   // Database analisi (segnali, trade storici)
+
+// ========================================
+// 📊 INTERFACCE - METRICHE DI PERFORMANCE
+// ========================================
+
+// Metriche di valutazione del modello ML
 export interface LearningMetrics {
-  accuracy: number;
-  precision: number;
-  recall: number;
-  f1Score: number;
-  confusionMatrix: number[][];
+  accuracy: number;           // Precisione generale (0-1): quanti trade sono corretti
+  precision: number;          // Precisione positivi (0-1): quanti LONG previsti sono corretti
+  recall: number;             // Richiamo (0-1): quanti LONG reali sono stati trovati
+  f1Score: number;            // F1-Score (0-1): media armonica di precision e recall
+  confusionMatrix: number[][]; // Matrice di confusione [[TP, FN], [FP, TN]]
 }
 
+// Importanza delle features nel modello
 export interface FeatureImportance {
-  rsi: number;
-  macd: number;
-  atr: number;
-  volume: number;
-  sentiment: number;
-  smartMoney: number;
-  priceAction: number;
-  multiTimeframe: number;
+  rsi: number;              // Peso dell'indicatore RSI
+  macd: number;             // Peso dell'indicatore MACD  
+  atr: number;              // Peso della volatilità (ATR)
+  volume: number;           // Peso dell'analisi volumi
+  sentiment: number;        // Peso dell'analisi sentiment
+  smartMoney: number;       // Peso dell'analisi Smart Money
+  priceAction: number;      // Peso dell'analisi Price Action
+  multiTimeframe: number;   // Peso dell'analisi multi-timeframe
 }
 
+// Parametri di apprendimento adattivo
 export interface AdaptiveLearning {
-  learningRate: number;
-  regularization: number;
-  batchSize: number;
-  dropoutRate: number;
-  optimizerType: string;
+  learningRate: number;     // Velocità di apprendimento
+  regularization: number;   // Regolarizzazione (previene overfitting)
+  batchSize: number;        // Dimensione batch per training
+  dropoutRate: number;      // Tasso di dropout (previene overfitting)
+  optimizerType: string;    // Tipo di ottimizzatore (Adam, SGD, etc.)
 }
+
+// ========================================
+// 🧠 CLASSE PRINCIPALE - MOTORE ML ADATTIVO
+// ========================================
+// Questa classe implementa un sistema di Machine Learning che:
+// 1. Impara dai trade passati per migliorare le previsioni future
+// 2. Si adatta automaticamente a diversi market conditions
+// 3. Individua pattern ricorrenti nei mercati finanziari
+// 4. Ottimizza continuamente i parametri del modello
 
 export class MLLearningEngine {
-  private modelVersion = "v2.0";
-  private currentEpoch = 0;
+  private modelVersion = "v2.0";      // Versione corrente del modello ML
+  private currentEpoch = 0;           // Epoca di training corrente
 
+  // ========================================
+  // 🎯 METODO PRINCIPALE: TRAINING DEL MODELLO
+  // ========================================
+  /**
+   * Esegue un ciclo completo di training del modello ML
+   * Analizza i trade passati e ottimizza i parametri per migliorare le performance future
+   * 
+   * @returns Promise<LearningMetrics> - Metriche di performance del modello
+   */
   async trainModel(): Promise<LearningMetrics> {
-    console.log("🤖 Starting ML model training cycle...");
+    console.log("🤖 Avvio ciclo di training del modello ML...");
 
+    // ===== FASE 1: RACCOLTA DATI DI TRAINING =====
+    // Recupera i dati storici dei trade per l'apprendimento
     const trainingData = await this.getTrainingData();
     
+    // ===== FASE 2: VERIFICA DATI SUFFICIENTI =====
+    // Servono almeno 20 trade per un training significativo
     if (trainingData.length < 20) {
-      console.log("⚠️ Insufficient training data (< 20 trades), skipping training cycle.");
+      console.log("⚠️ Dati insufficienti (< 20 trade), salto il ciclo di training.");
       return this.generateSimulatedMetrics();
     }
 
-    // Analyze performance by different dimensions
-    await this.analyzeAndAdaptByDimension('symbol', trainingData);
-    await this.analyzeAndAdaptByDimension('strategy', trainingData);
-    await this.analyzeAndAdaptByDimension('session', trainingData);
+    // ===== FASE 3: APPRENDIMENTO ADATTIVO MULTI-DIMENSIONALE =====
+    // Il sistema impara e si adatta automaticamente analizzando le performance per:
+    await this.analyzeAndAdaptByDimension('symbol', trainingData);    // Diversi simboli (BTC, EUR/USD, etc.)
+    await this.analyzeAndAdaptByDimension('strategy', trainingData);  // Diverse strategie di trading
+    await this.analyzeAndAdaptByDimension('session', trainingData);   // Diverse sessioni di mercato
 
+    // ===== FASE 4: SIMULAZIONE TRAINING =====
+    // Simula il processo di training e calcola le metriche
     const metrics = await this.simulateTraining(trainingData);
+    
+    // ===== FASE 5: REGISTRAZIONE PROGRESSI =====
+    // Salva i progressi nel database per monitoraggio
     await this.recordTrainingProgress(metrics);
+    
+    // ===== FASE 6: AGGIORNAMENTO IMPORTANZA FEATURES =====
+    // Aggiorna l'importanza di ogni feature (RSI, MACD, etc.)
     await this.updateFeatureImportance();
 
-    console.log("✅ ML model training cycle completed.");
+    console.log("✅ Ciclo di training del modello ML completato.");
     return metrics;
   }
 

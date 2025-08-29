@@ -1,1 +1,10 @@
-{"id": "telegram-trading-bot-d6u2", "lang": "typescript"}
+{
+  "id": "ai-trading-system",
+  "name": "AI Trading System", 
+  "lang": "typescript",
+  "build": {
+    "docker": {
+      "bundle_source": true
+    }
+  }
+}

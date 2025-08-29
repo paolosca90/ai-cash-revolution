@@ -8,11 +8,13 @@
     "frontend"
   ],
   "scripts": {
-    "mock-backend": "node mock-backend.js",
-    "start": "node mock-backend.js"
+    "dev": "cd backend && encore run",
+    "build": "cd backend && bun run build",
+    "test": "cd backend && encore test",
+    "deploy": "cd backend && encore deploy"
   },
-  "dependencies": {
-    "express": "^4.18.2",
-    "cors": "^2.8.5"
+  "dependencies": {},
+  "devDependencies": {
+    "encore.dev": "^1.49.1"
   }
 }

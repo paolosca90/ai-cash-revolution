@@ -1,93 +1,163 @@
+// ========================================
+// 🤖 MOTORE AI PRINCIPALE - SISTEMA DI TRADING INTELLIGENTE
+// ========================================
+// Questo è il cuore del sistema AI che analizza i mercati finanziari
+// e genera segnali di trading utilizzando multiple tecniche avanzate
+
+// Importazioni delle configurazioni e utilities di Encore
 import { secret } from "encore.dev/config";
-import { TimeframeData } from "./market-data";
-import { analyzeSentiment } from "./sentiment-analyzer";
-import { analyzeVWAP, generateVWAPSignals } from "./vwap-analyzer";
+
+// Importazioni dei moduli di analisi specializzati
+import { TimeframeData } from "./market-data";              // Dati di mercato multi-timeframe
+import { analyzeSentiment } from "./sentiment-analyzer";    // Analisi sentiment delle news
+import { analyzeVWAP, generateVWAPSignals } from "./vwap-analyzer"; // Analisi Volume Weighted Average Price
+
+// Moduli di analisi tecnica avanzata
 import { 
-  calculateEnhancedIndicators, 
-  analyzeMultiTimeframeConfluence, 
-  getMarketConditionContext,
-  MultiTimeframeAnalysis,
-  MarketConditionContext,
-  EnhancedIndicators
+  calculateEnhancedIndicators,      // Calcola indicatori tecnici avanzati
+  analyzeMultiTimeframeConfluence,  // Analizza confluenza tra timeframes
+  getMarketConditionContext,        // Ottiene contesto di mercato attuale
+  MultiTimeframeAnalysis,           // Tipo per analisi multi-timeframe
+  MarketConditionContext,           // Tipo per contesto di mercato
+  EnhancedIndicators                // Tipo per indicatori avanzati
 } from "./enhanced-technical-analysis";
+
+// Sistema di calcolo della confidenza avanzato
 import { 
-  calculateEnhancedConfidence,
-  EnhancedConfidenceResult
+  calculateEnhancedConfidence,      // Calcola confidenza con algoritmi avanzati
+  EnhancedConfidenceResult          // Risultato della valutazione di confidenza
 } from "./enhanced-confidence-system";
+
+// Analisi istituzionale per identificare movimenti degli "Smart Money"
 import {
-  performInstitutionalAnalysis,
-  InstitutionalAnalysis
+  performInstitutionalAnalysis,     // Analizza comportamenti istituzionali
+  InstitutionalAnalysis             // Risultati dell'analisi istituzionale
 } from "./institutional-analysis";
-import { learningEngine } from "../ml/learning-engine";
-import { TradingStrategy } from "./trading-strategies";
+
+// Machine Learning per apprendimento adattivo
+import { learningEngine } from "../ml/learning-engine";     // Motore di apprendimento automatico
+import { TradingStrategy } from "./trading-strategies";     // Definizione strategie di trading
+
+// Chiave API per Gemini AI (Google)
 const geminiApiKey = secret("GeminiApiKey");
 
+// ========================================
+// 📊 INTERFACCIA RISULTATO ANALISI AI
+// ========================================
+// Questa interfaccia definisce tutti i dati che il motore AI restituisce
+// dopo aver analizzato un asset finanziario
+
 export interface AIAnalysis {
-  direction: "LONG" | "SHORT";
-  confidence: number;
-  enhancedConfidence: EnhancedConfidenceResult; // New enhanced confidence system
-  institutionalAnalysis: InstitutionalAnalysis; // New institutional analysis
-  support: number;
-  resistance: number;
+  // ===== SEGNALE PRINCIPALE =====
+  direction: "LONG" | "SHORT";           // Direzione consigliata: COMPRARE o VENDERE
+  confidence: number;                    // Confidenza del segnale (0-100%)
+  
+  // ===== SISTEMI DI CONFIDENZA AVANZATI =====
+  enhancedConfidence: EnhancedConfidenceResult; // Sistema di confidenza con ML e algoritmi avanzati
+  institutionalAnalysis: InstitutionalAnalysis; // Analisi comportamento degli istituzionali
+  
+  // ===== LIVELLI CHIAVE =====
+  support: number;                       // Livello di supporto (dove prezzo potrebbe rimbalzare)
+  resistance: number;                    // Livello di resistenza (dove prezzo potrebbe fermarsi)
+  
+  // ===== ANALISI SENTIMENT =====
   sentiment: {
-    score: number;
-    sources: string[];
+    score: number;                       // Punteggio sentiment (-100 a +100)
+    sources: string[];                   // Fonti delle notizie analizzate
   };
+  
+  // ===== ANALISI VOLATILITÀ =====
   volatility: {
-    hourly: number;
-    daily: number;
+    hourly: number;                      // Volatilità oraria (quanto si muove il prezzo)
+    daily: number;                       // Volatilità giornaliera
   };
+  
+  // ===== ANALISI SMART MONEY (Denaro Intelligente) =====
+  // Analizza il comportamento delle istituzioni finanziarie
   smartMoney: {
-    institutionalFlow: "BUYING" | "SELLING" | "NEUTRAL";
-    volumeProfile: "ACCUMULATION" | "DISTRIBUTION" | "CONSOLIDATION";
-    orderFlow: "BULLISH" | "BEARISH" | "NEUTRAL";
-    liquidityZones: number[];
+    institutionalFlow: "BUYING" | "SELLING" | "NEUTRAL";           // Flusso istituzionale
+    volumeProfile: "ACCUMULATION" | "DISTRIBUTION" | "CONSOLIDATION"; // Profilo volumi
+    orderFlow: "BULLISH" | "BEARISH" | "NEUTRAL";                  // Flusso degli ordini
+    liquidityZones: number[];                                      // Zone di liquidità
   };
+  
+  // ===== ANALISI PRICE ACTION =====
+  // Analizza il comportamento del prezzo e i pattern grafici
   priceAction: {
-    trend: "UPTREND" | "DOWNTREND" | "SIDEWAYS";
-    structure: "BULLISH" | "BEARISH" | "NEUTRAL";
-    keyLevels: number[];
-    breakoutProbability: number;
+    trend: "UPTREND" | "DOWNTREND" | "SIDEWAYS";                  // Trend principale
+    structure: "BULLISH" | "BEARISH" | "NEUTRAL";                 // Struttura di mercato
+    keyLevels: number[];                                           // Livelli chiave di prezzo
+    breakoutProbability: number;                                   // Probabilità di rottura (0-100%)
   };
+  
+  // ===== ANALISI TRADERS PROFESSIONISTI =====
+  // Simula l'analisi di trader esperti e istituzioni
   professionalAnalysis: {
-    topTraders: string[];
-    consensusView: "BULLISH" | "BEARISH" | "NEUTRAL";
-    riskReward: number;
-    timeframe: string;
+    topTraders: string[];                                          // Lista dei top trader per l'asset
+    consensusView: "BULLISH" | "BEARISH" | "NEUTRAL";             // Consenso generale
+    riskReward: number;                                            // Rapporto rischio/rendimento
+    timeframe: string;                                             // Timeframe ottimale per il trade
   };
+  
+  // ===== INDICATORI TECNICI BASE =====
+  // Indicatori tecnici tradizionali per compatibilità
   technical: {
-    rsi: number;
-    macd: number;
-    atr: number;
+    rsi: number;                         // Relative Strength Index (14 periodi)
+    macd: number;                        // MACD (Moving Average Convergence Divergence)
+    atr: number;                         // Average True Range (volatilità)
   };
+  
+  // ===== ANALISI TECNICA AVANZATA =====
+  // Indicatori avanzati calcolati su più timeframes
   enhancedTechnical: {
-    indicators5m: EnhancedIndicators;
-    indicators15m: EnhancedIndicators;
-    indicators30m: EnhancedIndicators;
-    multiTimeframeAnalysis: MultiTimeframeAnalysis;
-    marketContext: MarketConditionContext;
+    indicators5m: EnhancedIndicators;                              // Indicatori timeframe 5 minuti
+    indicators15m: EnhancedIndicators;                             // Indicatori timeframe 15 minuti
+    indicators30m: EnhancedIndicators;                             // Indicatori timeframe 30 minuti
+    multiTimeframeAnalysis: MultiTimeframeAnalysis;               // Analisi confluenza tra timeframes
+    marketContext: MarketConditionContext;                        // Contesto di mercato attuale
   };
-  // Enhanced analysis components
+  
+  // ===== ANALISI VWAP (Volume Weighted Average Price) =====
+  // Analisi del prezzo medio ponderato per volume
   vwap: {
-    analysis: any;
-    signals: any;
+    analysis: any;                       // Dati analisi VWAP
+    signals: any;                        // Segnali generati dal VWAP
   };
 }
 
-// Cache for Gemini responses to reduce API calls
+// ========================================
+// 💾 SISTEMA DI CACHING PER GEMINI AI
+// ========================================
+// Cache per ridurre le chiamate API a Gemini AI e risparmiare quota
 const geminiCache = new Map<string, { response: any; timestamp: number }>();
-const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+const CACHE_DURATION = 5 * 60 * 1000; // Cache valida per 5 minuti
 
+// ========================================
+// 🧠 FUNZIONE PRINCIPALE DI ANALISI AI
+// ========================================
+// Questa è la funzione principale che orchestra tutte le analisi
+// e combina i risultati per generare un segnale di trading completo
+/**
+ * Analizza un asset finanziario utilizzando AI e algoritmi avanzati
+ * 
+ * @param marketData - Dati di mercato su più timeframes (5m, 15m, 30m)
+ * @param symbol - Simbolo dell'asset (es: "BTCUSD", "EURUSD")  
+ * @param strategy - Strategia di trading da applicare
+ * @returns Promise<AIAnalysis> - Risultato completo dell'analisi
+ */
 export async function analyzeWithAI(marketData: TimeframeData, symbol: string, strategy: TradingStrategy): Promise<AIAnalysis> {
-  // Extract key data from different timeframes
-  const data5m = marketData["5m"];
-  const data15m = marketData["15m"];
-  const data30m = marketData["30m"];
+  // ===== FASE 1: ESTRAZIONE DATI =====
+  // Estraiamo i dati da tutti i timeframes per l'analisi
+  const data5m = marketData["5m"];     // Dati 5 minuti (analisi a breve termine)
+  const data15m = marketData["15m"];   // Dati 15 minuti (analisi intermedia) 
+  const data30m = marketData["30m"];   // Dati 30 minuti (analisi a medio termine)
 
-  console.log(`🔍 Starting enhanced AI analysis for ${symbol}`);
+  console.log(`🔍 Iniziata analisi AI avanzata per ${symbol}`);
 
-  // ========== ENHANCED TECHNICAL ANALYSIS ==========
-  // Calculate enhanced indicators for each timeframe
+  // ===== FASE 2: ANALISI TECNICA AVANZATA =====
+  // Calcoliamo indicatori tecnici sofisticati per ogni timeframe
+  // Questi includono RSI, MACD, Bollinger Bands, Moving Averages, etc.
+  
   const indicators5m = calculateEnhancedIndicators(
     [data5m.open], [data5m.high], [data5m.low], [data5m.close]
   );
@@ -100,15 +170,19 @@ export async function analyzeWithAI(marketData: TimeframeData, symbol: string, s
     [data30m.open], [data30m.high], [data30m.low], [data30m.close]
   );
 
-  // Analyze multi-timeframe confluence
+  // ===== FASE 3: ANALISI MULTI-TIMEFRAME =====
+  // Analizziamo la confluenza tra i diversi timeframes
+  // Più timeframes che concordano = segnale più affidabile
   const multiTimeframeAnalysis = analyzeMultiTimeframeConfluence(data5m, data15m, data30m);
   
-  // Get current market condition context
+  // ===== FASE 4: CONTESTO DI MERCATO =====
+  // Otteniamo il contesto attuale: sessione di trading, volatilità, eventi
   const marketContext = getMarketConditionContext();
 
-  console.log(`📊 Multi-timeframe confluence: ${multiTimeframeAnalysis.confluence}%`);
-  console.log(`⏰ Market session: ${marketContext.sessionType}`);
-  console.log(`📈 Volatility state: ${multiTimeframeAnalysis.volatilityState}`);
+  // Log delle informazioni chiave per debugging
+  console.log(`📊 Confluenza multi-timeframe: ${multiTimeframeAnalysis.confluence}%`);
+  console.log(`⏰ Sessione di mercato: ${marketContext.sessionType}`);
+  console.log(`📈 Stato volatilità: ${multiTimeframeAnalysis.volatilityState}`);
 
   // ========== TRADITIONAL ANALYSIS (Enhanced) ==========
   // Advanced price action analysis with enhanced calculations
