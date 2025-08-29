@@ -1,1 +1,0 @@
-{"id": "telegram-trading-bot-d6u2", "lang": "typescript"}
