@@ -287,7 +287,58 @@ app.get('/api/deployment/info', (req, res) => {
 
 // Serve React app for all other routes (SPA routing)
 app.get('*', (req, res) => {
-    res.sendFile(path.join(__dirname, 'frontend', 'dist', 'index.html'));
+    const reactIndexPath = path.join(__dirname, 'frontend', 'dist', 'index.html');
+    const fallbackHtmlPath = path.join(__dirname, 'simple_frontend.html');
+    
+    // Try to serve React build first, fallback to simple HTML
+    const fs = require('fs');
+    
+    if (fs.existsSync(reactIndexPath)) {
+        res.sendFile(reactIndexPath);
+    } else if (fs.existsSync(fallbackHtmlPath)) {
+        res.sendFile(fallbackHtmlPath);
+    } else {
+        // Ultimate fallback - inline HTML
+        res.send(`
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Cash R-evolution - Sistema AI Trading</title>
+    <style>
+        body { font-family: Arial, sans-serif; background: #1e293b; color: white; margin: 0; padding: 20px; text-align: center; }
+        .container { max-width: 800px; margin: 0 auto; }
+        .status { background: #10b981; padding: 20px; border-radius: 10px; margin: 20px 0; }
+        .api-links { margin: 20px 0; }
+        .api-links a { color: #3b82f6; margin: 0 10px; }
+        h1 { color: #60a5fa; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚀 AI Cash R-evolution</h1>
+        <div class="status">
+            <h2>✅ Sistema Attivo</h2>
+            <p>Backend v2.0.0 funzionante</p>
+            <p>Frontend in fase di configurazione</p>
+        </div>
+        
+        <div class="api-links">
+            <h3>API Endpoints Disponibili:</h3>
+            <a href="/health" target="_blank">Health Check</a>
+            <a href="/api/status" target="_blank">System Status</a>
+            <a href="/api/analysis/top-signals" target="_blank">Trading Signals</a>
+            <a href="/api/ml/analytics" target="_blank">ML Analytics</a>
+        </div>
+        
+        <p>Il sistema di trading AI è operativo.<br>
+        Frontend in configurazione avanzata.</p>
+    </div>
+</body>
+</html>
+        `);
+    }
 });
 
 app.listen(PORT, () => {
