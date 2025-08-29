@@ -67,32 +67,39 @@ app.use('*', (req, res) => {
   });
 });
 
-// Start server
-app.listen(PORT, () => {
-  console.log(`🚀 Server is running on http://localhost:${PORT}`);
-  console.log(`📊 Health check available at http://localhost:${PORT}/health`);
+// Start server only in development (Vercel handles this in production)
+if (Config.isDevelopment()) {
+  app.listen(PORT, () => {
+    console.log(`🚀 Server is running on http://localhost:${PORT}`);
+    console.log(`📊 Health check available at http://localhost:${PORT}/health`);
+    console.log(`🌍 Environment: ${Config.NODE_ENV}`);
+    console.log(`🔗 Frontend URL: ${Config.FRONTEND_URL}`);
+    console.log(`💾 Database: ${Config.isDevelopment() ? 'Local PostgreSQL' : 'Production Database'}`);
+    console.log(`📈 Trading Mode: ${Config.IS_PRODUCTION ? 'LIVE TRADING' : 'DEMO MODE'}`);
+    console.log(`🔐 Security: ${Config.isDevelopment() ? 'Development Keys' : 'Production Keys'}`);
+    
+    // Validate and report configured services
+    const serviceValidation = ExternalAPIManager.validateConfiguredServices();
+    
+    if (serviceValidation.valid.length > 0) {
+      console.log(`✅ Configured services: ${serviceValidation.valid.join(', ')}`);
+    }
+    
+    if (serviceValidation.warnings.length > 0) {
+      serviceValidation.warnings.forEach(warning => {
+        console.warn(`⚠️  ${warning}`);
+      });
+    }
+    
+    if (serviceValidation.missing.length > 0) {
+      console.log(`ℹ️  Available services not configured: ${serviceValidation.missing.join(', ')}`);
+    }
+  });
+} else {
+  // In production, log startup info
+  console.log(`🚀 Trading Backend starting in production mode`);
   console.log(`🌍 Environment: ${Config.NODE_ENV}`);
-  console.log(`🔗 Frontend URL: ${Config.FRONTEND_URL}`);
-  console.log(`💾 Database: ${Config.isDevelopment() ? 'Local PostgreSQL' : 'Production Database'}`);
   console.log(`📈 Trading Mode: ${Config.IS_PRODUCTION ? 'LIVE TRADING' : 'DEMO MODE'}`);
-  console.log(`🔐 Security: ${Config.isDevelopment() ? 'Development Keys' : 'Production Keys'}`);
-  
-  // Validate and report configured services
-  const serviceValidation = ExternalAPIManager.validateConfiguredServices();
-  
-  if (serviceValidation.valid.length > 0) {
-    console.log(`✅ Configured services: ${serviceValidation.valid.join(', ')}`);
-  }
-  
-  if (serviceValidation.warnings.length > 0) {
-    serviceValidation.warnings.forEach(warning => {
-      console.warn(`⚠️  ${warning}`);
-    });
-  }
-  
-  if (serviceValidation.missing.length > 0) {
-    console.log(`ℹ️  Available services not configured: ${serviceValidation.missing.join(', ')}`);
-  }
-});
+}
 
 export default app;
