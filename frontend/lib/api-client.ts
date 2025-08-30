@@ -190,14 +190,14 @@ export class ApiClient {
   }
 
   async login(credentials: any) {
-    return this.request('/api/user/login', {
+    return this.request('/api/auth/login', {
       method: 'POST',
       body: JSON.stringify(credentials),
     });
   }
 
   async register(userData: any) {
-    return this.request('/api/user/register', {
+    return this.request('/api/auth/register', {
       method: 'POST',
       body: JSON.stringify(userData),
     });
