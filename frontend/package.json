@@ -34,12 +34,9 @@
     "tailwind-merge": "^3.3.1",
     "tailwindcss": "^4.1.12",
     "zod": "^3.25.76",
-    "@stripe/stripe-js": "^3.0.5",
-    "express": "^4.21.2",
-    "@vercel/node": "^5.0.0"
+    "@stripe/stripe-js": "^3.0.5"
   },
   "devDependencies": {
-    "@rollup/rollup-linux-x64-gnu": "^4.46.3",
     "@tailwindcss/oxide": "^4.1.12",
     "@types/react": "^19.1.10",
     "@types/react-dom": "^19.1.7",
