@@ -3,23 +3,24 @@ export class ApiClient {
   private baseURL: string;
 
   constructor() {
-    // Use environment variable if available, otherwise fallback to deployed URLs
-    this.baseURL = import.meta.env.VITE_API_URL || 
-      (import.meta.env.PROD 
-        ? 'https://ai-cash-revolution-backend-nkcdzubal-paolos-projects-dc6990da.vercel.app' 
+    // Connect to the Express backend server (which connects to MT5 bridge internally)
+    this.baseURL = import.meta.env.VITE_API_URL ||
+      (import.meta.env.PROD
+        ? 'https://backend-c10yefh44-paolos-projects-dc6990da.vercel.app'
         : 'http://localhost:3001');
   }
 
   private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
     const url = `${this.baseURL}${endpoint}`;
     
-    // Remove any authorization headers that might cause issues
-    const { authorization, ...otherHeaders } = options.headers || {};
+    // Get authentication token from localStorage
+    const token = localStorage.getItem('auth_token') || localStorage.getItem('supabase.auth.token');
     
     const config: RequestInit = {
       headers: {
         'Content-Type': 'application/json',
-        ...otherHeaders,
+        ...(token && { 'Authorization': `Bearer ${token}` }),
+        ...options.headers,
       },
       ...options,
     };
@@ -30,8 +31,7 @@ export class ApiClient {
       // Check if we hit a Vercel authentication page (deployment protection)
       if (response.headers.get('content-type')?.includes('text/html') && 
           (await response.clone().text()).includes('Authentication Required')) {
-        console.warn('Backend is protected by Vercel authentication. Using mock data for demo.');
-        return this.getMockResponse(endpoint, options.method || 'GET') as T;
+        throw new Error('Backend is protected by Vercel authentication. Please configure proper authentication.');
       }
       
       // If we get a 401, try again without headers
@@ -44,9 +44,8 @@ export class ApiClient {
         });
         
         if (!retryResponse.ok) {
-          // If still fails, return mock data
-          console.warn('Backend authentication failed. Using mock data for demo.');
-          return this.getMockResponse(endpoint, options.method || 'GET') as T;
+          // If still fails, throw error
+          throw new Error(`Authentication failed: ${retryResponse.status} ${retryResponse.statusText}`);
         }
         
         const data = await retryResponse.json();
@@ -67,11 +66,8 @@ export class ApiClient {
           // Ignore JSON parse errors, use default message
         }
         
-        // For production demo, use mock data instead of throwing errors
-        if (import.meta.env.PROD) {
-          console.warn(`Backend error (${response.status}). Using mock data for demo.`);
-          return this.getMockResponse(endpoint, options.method || 'GET') as T;
-        }
+        // PRODUCTION: Always throw errors for failed requests - no mock fallbacks
+        console.error(`Backend error (${response.status}): ${errorMessage}`);
         
         throw new Error(errorMessage);
       }
@@ -81,11 +77,8 @@ export class ApiClient {
     } catch (error) {
       console.error(`API request failed: ${endpoint}`, error);
       
-      // In production, provide mock data instead of failing
-      if (import.meta.env.PROD) {
-        console.warn('API request failed in production. Using mock data for demo.');
-        return this.getMockResponse(endpoint, options.method || 'GET') as T;
-      }
+      // PRODUCTION: Always throw real errors - zero tolerance for mock data
+      console.error(`API request failed: ${endpoint}`, error);
       
       // Provide more specific error messages for common issues
       if (error instanceof TypeError && error.message.includes('fetch')) {
@@ -100,267 +93,7 @@ export class ApiClient {
     }
   }
 
-  // Mock response provider for demo purposes
-  private getMockResponse(endpoint: string, method: string): any {
-    // Health endpoint
-    if (endpoint.includes('/health')) {
-      return { status: 'ok', timestamp: new Date().toISOString(), service: 'trading-bot-backend' };
-    }
-
-    // Top signals endpoint
-    if (endpoint.includes('/analysis/top-signals')) {
-      return {
-        signals: [
-          {
-            id: '1',
-            symbol: 'EURUSD',
-            direction: 'LONG',
-            confidence: 0.87,
-            entryPrice: 1.0850,
-            stopLoss: 1.0800,
-            takeProfit: 1.0920,
-            riskRewardRatio: 1.2,
-            strategy: 'ai_model_v1',
-            timeframe: 'M5',
-            createdAt: new Date().toISOString(),
-            tradeId: 'trade-1',
-            status: 'active'
-          },
-          {
-            id: '2',
-            symbol: 'GBPUSD',
-            direction: 'SHORT',
-            confidence: 0.82,
-            entryPrice: 1.2650,
-            stopLoss: 1.2700,
-            takeProfit: 1.2580,
-            riskRewardRatio: 1.1,
-            strategy: 'ai_model_v1',
-            timeframe: 'M5',
-            createdAt: new Date().toISOString(),
-            tradeId: 'trade-2',
-            status: 'active'
-          },
-          {
-            id: '3',
-            symbol: 'USDJPY',
-            direction: 'LONG',
-            confidence: 0.78,
-            entryPrice: 149.50,
-            stopLoss: 149.00,
-            takeProfit: 150.20,
-            riskRewardRatio: 1.3,
-            strategy: 'ai_model_v1',
-            timeframe: 'M5',
-            createdAt: new Date().toISOString(),
-            tradeId: 'trade-3',
-            status: 'active'
-          }
-        ]
-      };
-    }
-
-    // Signal stats endpoint
-    if (endpoint.includes('/analysis/signal-stats')) {
-      return {
-        totalGenerated: 42,
-        totalExecuted: 38,
-        totalClosed: 35,
-        avgConfidence: 82.5,
-        lastGenerationTime: new Date().toISOString(),
-        topPerformingSymbol: 'EURUSD'
-      };
-    }
-
-    // Performance endpoint
-    if (endpoint.includes('/analysis/performance')) {
-      return {
-        totalTrades: 145,
-        winRate: 72.4,
-        totalProfitLoss: 2847.50,
-        bestTrade: 150.25,
-        profitFactor: 1.85,
-        currentStreak: 3,
-        sharpeRatio: 1.42,
-        totalProfit: 2847.50,
-        dailyPnL: 125.30,
-        weeklyReturn: 3.2,
-        monthlyReturn: 12.8
-      };
-    }
-
-    // ML analytics endpoint
-    if (endpoint.includes('/ml/analytics')) {
-      return {
-        modelPerformance: {
-          accuracy: 0.84,
-          precision: 0.82,
-          recall: 0.78,
-          f1Score: 0.80
-        },
-        predictionStats: {
-          totalPredictions: 1250,
-          correctPredictions: 1050,
-          accuracy: 0.84
-        },
-        featureImportance: [
-          { feature: 'RSI', importance: 0.15, type: 'momentum' },
-          { feature: 'MACD', importance: 0.12, type: 'trend' },
-          { feature: 'BB_Width', importance: 0.10, type: 'volatility' },
-          { feature: 'Volume', importance: 0.09, type: 'volume' },
-          { feature: 'MA50', importance: 0.08, type: 'trend' },
-          { feature: 'Stochastic', importance: 0.07, type: 'momentum' },
-          { feature: 'ATR', importance: 0.06, type: 'volatility' },
-          { feature: 'ADX', importance: 0.05, type: 'trend' }
-        ],
-        performanceTimeline: [
-          { date: new Date(Date.now() - 7*24*60*60*1000).toISOString(), accuracy: 0.82, profitLoss: 1250, predictions: 120 },
-          { date: new Date(Date.now() - 6*24*60*60*1000).toISOString(), accuracy: 0.85, profitLoss: 1420, predictions: 115 },
-          { date: new Date(Date.now() - 5*24*60*60*1000).toISOString(), accuracy: 0.83, profitLoss: 1380, predictions: 130 },
-          { date: new Date(Date.now() - 4*24*60*60*1000).toISOString(), accuracy: 0.86, profitLoss: 1560, predictions: 125 },
-          { date: new Date(Date.now() - 3*24*60*60*1000).toISOString(), accuracy: 0.84, profitLoss: 1480, predictions: 140 },
-          { date: new Date(Date.now() - 2*24*60*60*1000).toISOString(), accuracy: 0.87, profitLoss: 1620, predictions: 135 },
-          { date: new Date(Date.now() - 1*24*60*60*1000).toISOString(), accuracy: 0.85, profitLoss: 1580, predictions: 145 }
-        ],
-        lastUpdate: new Date().toISOString()
-      };
-    }
-
-    // Market overview
-    if (endpoint.includes('/analysis/market-overview')) {
-      return {
-        marketSentiment: 'bullish',
-        volatilityIndex: 0.65,
-        trendStrength: 0.78,
-        activeSignals: 12,
-        opportunityScore: 0.82
-      };
-    }
-
-    // User profile
-    if (endpoint.includes('/user/profile')) {
-      return {
-        id: 'demo-user',
-        name: 'Demo User',
-        email: 'demo@example.com',
-        subscription: 'pro',
-        accountBalance: 10000.00,
-        riskTolerance: 'medium'
-      };
-    }
-
-    // Trading accounts
-    if (endpoint.includes('/user/trading-accounts')) {
-      return [
-        {
-          id: '1',
-          name: 'Demo Account',
-          type: 'MT5',
-          balance: 10000.00,
-          status: 'connected',
-          server: 'Demo-Server'
-        }
-      ];
-    }
-
-    // Orders
-    if (endpoint.includes('/trading/orders')) {
-      return [
-        {
-          id: '1',
-          symbol: 'EURUSD',
-          type: 'BUY',
-          volume: 0.1,
-          openPrice: 1.0850,
-          currentPrice: 1.0865,
-          profit: 15.00,
-          status: 'open'
-        }
-      ];
-    }
-
-    // Positions
-    if (endpoint.includes('/analysis/positions')) {
-      return {
-        positions: [
-          {
-            ticket: 12345678,
-            symbol: 'EURUSD',
-            type: 0, // 0 for BUY, 1 for SELL
-            volume: 0.1,
-            openPrice: 1.0850,
-            currentPrice: 1.0865,
-            stopLoss: 1.0800,
-            takeProfit: 1.0920,
-            profit: 15.00,
-            timestamp: new Date(),
-            comment: 'Demo position'
-          }
-        ]
-      };
-    }
-
-    // History
-    if (endpoint.includes('/analysis/history')) {
-      return {
-        signals: [
-          {
-            id: 'hist-1',
-            symbol: 'EURUSD',
-            direction: 'LONG',
-            confidence: 0.87,
-            entryPrice: 1.0850,
-            stopLoss: 1.0800,
-            takeProfit: 1.0920,
-            riskRewardRatio: 1.2,
-            strategy: 'ai_model_v1',
-            timeframe: 'M5',
-            createdAt: new Date(Date.now() - 24*60*60*1000).toISOString(),
-            tradeId: 'trade-1',
-            status: 'closed',
-            profit: 70.50
-          },
-          {
-            id: 'hist-2',
-            symbol: 'GBPUSD',
-            direction: 'SHORT',
-            confidence: 0.82,
-            entryPrice: 1.2650,
-            stopLoss: 1.2700,
-            takeProfit: 1.2580,
-            riskRewardRatio: 1.1,
-            strategy: 'ai_model_v1',
-            timeframe: 'M5',
-            createdAt: new Date(Date.now() - 48*60*60*1000).toISOString(),
-            tradeId: 'trade-2',
-            status: 'closed',
-            profit: -45.25
-          }
-        ]
-      };
-    }
-
-    // MT5 Config
-    if (endpoint.includes('/user/mt5-config')) {
-      return {
-        login: '12345678',
-        server: 'MetaQuotes-Demo',
-        broker: 'MetaQuotes'
-      };
-    }
-
-    // Subscription
-    if (endpoint.includes('/user/subscription')) {
-      return {
-        status: 'active',
-        plan: 'pro',
-        expiresAt: new Date(Date.now() + 30*24*60*60*1000).toISOString()
-      };
-    }
-
-    // Default empty response
-    return { message: 'Mock data for demo purposes' };
-  }
+  // PRODUCTION: No mock data - all responses must be real
 
   // Health check
   async health() {

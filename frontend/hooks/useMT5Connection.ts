@@ -1,12 +1,15 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useToast } from '@/components/ui/use-toast';
+import { useBackend } from './useBackend';
 
 export interface MT5Config {
   login: string;
   password: string;
   server: string;
   broker: string;
+  host: string;
+  port: number;
   path?: string; // Path to MT5 terminal
 }
 
@@ -32,117 +35,67 @@ export interface MT5Status {
 export const useMT5Connection = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [config, setConfig] = useState<MT5Config | null>(() => {
-    const saved = localStorage.getItem('mt5_config');
-    return saved ? JSON.parse(saved) : null;
+  const backend = useBackend();
+  const [config, setConfig] = useState<MT5Config | null>(null);
+
+  // Load config from backend instead of localStorage
+  const { data: backendConfig } = useQuery({
+    queryKey: ['mt5Config'],
+    queryFn: () => backend.user.getMt5Config(),
+    refetchOnMount: true,
+    staleTime: 5 * 60 * 1000, // 5 minutes
   });
+
+  // Update local config when backend config changes
+  useEffect(() => {
+    if (backendConfig?.config) {
+      const fullConfig: MT5Config = {
+        login: backendConfig.config.login,
+        password: '', // Password is not returned from backend for security
+        server: backendConfig.config.server,
+        broker: 'Demo', // Default broker
+        host: backendConfig.config.host,
+        port: backendConfig.config.port,
+      };
+      setConfig(fullConfig);
+    }
+  }, [backendConfig]);
 
   // Check if we're in a Vercel deployment (production environment)
   const isVercelDeployment = import.meta.env.PROD && 
     (window.location.hostname.includes('vercel.app') || 
      window.location.hostname.includes('ai-cash-revolution'));
 
-  // Check if MT5 terminal is running (for desktop app)
-  const checkMT5Process = useCallback(async (): Promise<boolean> => {
-    // In Vercel deployments, we can't access localhost resources
-    if (isVercelDeployment) {
-      return false;
-    }
-    
-    try {
-      // This would require a desktop app or browser extension
-      // For now, we'll simulate this check
-      return new Promise((resolve) => {
-        // Check if we can connect to local MT5 Python server
-        fetch('http://localhost:8080/api/mt5/status', {
-          method: 'GET',
-          timeout: 5000
-        })
-        .then(response => response.ok)
-        .catch(() => false)
-        .then(resolve);
-      });
-    } catch {
-      return false;
-    }
-  }, [isVercelDeployment]);
-
-  // Validate MT5 connection
+  // Validate MT5 connection using backend
   const validateConnection = useMutation({
     mutationFn: async (testConfig: MT5Config): Promise<MT5Status> => {
       if (!testConfig.login || !testConfig.server) {
         throw new Error('Login e server sono richiesti');
       }
 
-      // In Vercel deployments, we can't validate local MT5 connections
-      if (isVercelDeployment) {
-        // Return mock data for demo purposes
-        return {
-          isConnected: true,
-          isValidating: false,
-          accountInfo: {
-            balance: 10000,
-            equity: 10000,
-            margin: 0,
-            freeMargin: 10000,
-            marginLevel: 0,
-            name: 'Demo Account',
-            server: testConfig.server,
-            currency: 'USD',
-            leverage: 100,
-            company: 'MetaQuotes Software Corp'
-          },
-          lastUpdate: new Date()
-        };
+      if (!testConfig.host || !testConfig.port) {
+        throw new Error('Host e port sono richiesti');
       }
 
-      // First check if MT5 is running locally
-      const isLocalMT5Running = await checkMT5Process();
-      
-      if (!isLocalMT5Running) {
-        throw new Error('MetaTrader 5 non è in esecuzione sul PC. Avvia MT5 e riprova.');
-      }
-
-      // Try to connect via local Python bridge
       try {
-        const response = await fetch('http://localhost:8080/api/mt5/connect', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            login: parseInt(testConfig.login),
-            password: testConfig.password,
-            server: testConfig.server
-          }),
+        const response = await backend.user.testMt5Connection({
+          host: testConfig.host,
+          port: testConfig.port,
+          login: testConfig.login,
+          password: testConfig.password,
+          server: testConfig.server
         });
 
-        if (!response.ok) {
-          const error = await response.json();
-          throw new Error(error.message || 'Errore di connessione MT5');
-        }
-
-        const accountInfo = await response.json();
-        
-        return {
-          isConnected: true,
-          isValidating: false,
-          accountInfo: accountInfo,
-          lastUpdate: new Date()
-        };
-
+        return response.status;
       } catch (error: any) {
-        // If local connection fails, try cloud-based validation
-        if (error.message.includes('fetch')) {
-          throw new Error('Server MT5 locale non disponibile. Assicurati che il server Python sia attivo.');
-        }
-        throw error;
+        console.error('MT5 connection test error:', error);
+        throw new Error(error.message || 'Errore di connessione MT5');
       }
     },
     onSuccess: (status: MT5Status) => {
       toast({
         title: "✅ MT5 Connesso!",
-        description: `Account ${config?.login} connesso con successo`
+        description: `Account connesso con successo`
       });
       queryClient.setQueryData(['mt5Status'], status);
     },
@@ -154,86 +107,77 @@ export const useMT5Connection = () => {
     }
   });
 
-  // Get current MT5 status
+  // Get current MT5 status using backend
   const { data: mt5Status, isLoading: isCheckingStatus, refetch: recheckStatus } = useQuery<MT5Status>({
     queryKey: ['mt5Status'],
     queryFn: async (): Promise<MT5Status> => {
-      if (!config) {
-        return {
-          isConnected: false,
-          isValidating: false,
-          error: 'Nessuna configurazione MT5 trovata'
-        };
-      }
-
-      // In Vercel deployments, return mock data
-      if (isVercelDeployment) {
-        return {
-          isConnected: true,
-          isValidating: false,
-          accountInfo: {
-            balance: 10000,
-            equity: 10250,
-            margin: 1000,
-            freeMargin: 9250,
-            marginLevel: 1025,
-            name: 'Demo Account',
-            server: config.server,
-            currency: 'USD',
-            leverage: 100,
-            company: 'MetaQuotes Software Corp'
-          },
-          lastUpdate: new Date()
-        };
-      }
-
       try {
-        const response = await fetch('http://localhost:8080/api/mt5/account-info', {
-          method: 'GET',
-          timeout: 3000
-        });
-
-        if (response.ok) {
-          const accountInfo = await response.json();
-          return {
-            isConnected: true,
-            isValidating: false,
-            accountInfo,
-            lastUpdate: new Date()
-          };
-        } else {
-          throw new Error('MT5 disconnesso');
-        }
-      } catch {
+        const response = await backend.user.getMt5Status();
+        return response.status;
+      } catch (error: any) {
+        console.error('Error fetching MT5 status:', error);
         return {
           isConnected: false,
           isValidating: false,
-          error: 'MT5 non raggiungibile. Controlla che sia attivo.',
+          error: error.message || 'Errore nel recupero dello status MT5',
           lastUpdate: new Date()
         };
       }
     },
-    enabled: !!config,
+    enabled: true, // Always enabled to check status
     refetchInterval: 30000, // Check every 30 seconds
     retry: 1,
   });
 
-  // Save MT5 configuration
-  const saveMT5Config = useCallback((newConfig: MT5Config) => {
-    localStorage.setItem('mt5_config', JSON.stringify(newConfig));
-    setConfig(newConfig);
-    queryClient.invalidateQueries({ queryKey: ['mt5Status'] });
-  }, [queryClient]);
+  // Save MT5 configuration to backend
+  const saveMT5Config = useCallback(async (newConfig: MT5Config) => {
+    try {
+      await backend.user.updateMt5Config({
+        host: newConfig.host,
+        port: newConfig.port,
+        login: newConfig.login,
+        server: newConfig.server,
+        password: newConfig.password
+      });
+      
+      setConfig(newConfig);
+      queryClient.invalidateQueries({ queryKey: ['mt5Config'] });
+      queryClient.invalidateQueries({ queryKey: ['mt5Status'] });
+      
+      toast({
+        title: "✅ Configurazione Salvata",
+        description: "La configurazione MT5 è stata salvata con successo"
+      });
+    } catch (error: any) {
+      console.error('Error saving MT5 config:', error);
+      toast({
+        title: "❌ Errore Salvataggio",
+        description: error.message || "Errore nel salvataggio della configurazione"
+      });
+    }
+  }, [backend, queryClient, toast]);
 
   // Remove MT5 configuration
-  const removeMT5Config = useCallback(() => {
-    localStorage.removeItem('mt5_config');
-    setConfig(null);
-    queryClient.setQueryData(['mt5Status'], {
-      isConnected: false,
-      isValidating: false
-    });
-  }, [queryClient]);
+  const removeMT5Config = useCallback(async () => {
+    try {
+      // Clear the config by setting empty values
+      await backend.user.updateMt5Config({
+        host: '',
+        port: 0,
+        login: '',
+        server: ''
+      });
+      
+      setConfig(null);
+      queryClient.invalidateQueries({ queryKey: ['mt5Config'] });
+      queryClient.setQueryData(['mt5Status'], {
+        isConnected: false,
+        isValidating: false
+      });
+    } catch (error: any) {
+      console.error('Error removing MT5 config:', error);
+    }
+  }, [backend, queryClient]);
 
   // Test connection without saving
   const testConnection = useCallback(async (testConfig: MT5Config): Promise<boolean> => {
@@ -245,43 +189,26 @@ export const useMT5Connection = () => {
     }
   }, [validateConnection]);
 
-  // Get live market data
+  // Get live market data - Real data only through backend
   const getMarketData = useCallback(async (symbols: string[] = ['EURUSD', 'GBPUSD', 'USDJPY']) => {
-    // In Vercel deployments, return mock data
-    if (isVercelDeployment) {
-      return symbols.map(symbol => ({
-        symbol,
-        bid: Math.random() * 2 + 1,
-        ask: Math.random() * 2 + 1.001,
-        last: Math.random() * 2 + 1.0005,
-        volume: Math.floor(Math.random() * 1000000),
-        time: new Date().toISOString()
-      }));
-    }
-
-    if (!mt5Status?.isConnected) {
-      throw new Error('MT5 non connesso');
-    }
-
     try {
-      const response = await fetch('http://localhost:8080/api/mt5/quotes', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ symbols }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Errore nel recupero quotazioni');
+      // Get real market data through backend MT5 integration
+      const response = await backend.analysis.getTopSignals();
+      if (response && response.signals) {
+        return response.signals.map((signal: any) => ({
+          symbol: signal.symbol,
+          bid: signal.entryPrice || 0,
+          ask: signal.entryPrice ? signal.entryPrice + 0.0001 : 0,
+          last: signal.entryPrice || 0,
+          volume: 0,
+          time: signal.createdAt || new Date().toISOString()
+        }));
       }
-
-      return await response.json();
-    } catch (error) {
-      console.error('Errore market data:', error);
-      throw error;
+      throw new Error('No real market data available');
+    } catch (error: any) {
+      throw new Error('Market data requires real MT5 connection: ' + error.message);
     }
-  }, [mt5Status?.isConnected, isVercelDeployment]);
+  }, [backend]);
 
   return {
     // State
@@ -299,8 +226,8 @@ export const useMT5Connection = () => {
     getMarketData,
     
     // Computed
-    needsSetup: !config,
-    hasValidConfig: !!config?.login && !!config?.server,
+    needsSetup: !config || !config.login || !config.server || !config.host,
+    hasValidConfig: !!config?.login && !!config?.server && !!config?.host,
     statusMessage: mt5Status?.error || (mt5Status?.isConnected ? 'Connesso' : 'Disconnesso')
   };
 };

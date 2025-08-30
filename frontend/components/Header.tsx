@@ -3,7 +3,11 @@ import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import Nav from "./Nav";
 
-const Header = () => {
+interface HeaderProps {
+  onLogout?: () => void;
+}
+
+const Header: React.FC<HeaderProps> = ({ onLogout }) => {
   return (
     <header className="flex h-14 items-center gap-4 border-b bg-muted/40 px-4 lg:h-[60px] lg:px-6">
       <Sheet>
@@ -14,7 +18,7 @@ const Header = () => {
           </Button>
         </SheetTrigger>
         <SheetContent side="left" className="flex flex-col">
-          <Nav />
+          <Nav onLogout={onLogout} />
         </SheetContent>
       </Sheet>
       <div className="w-full flex-1">

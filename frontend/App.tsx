@@ -30,12 +30,81 @@ const queryClient = new QueryClient({
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [authLoading, setAuthLoading] = useState(true);
+  
+  const verifyToken = async (token: string) => {
+    try {
+      // Handle demo tokens for development/testing
+      if (token.startsWith('demo-')) {
+        const userData = localStorage.getItem('user_data');
+        if (userData) {
+          return true; // Demo token with user data is valid
+        }
+        return false;
+      }
+
+      const response = await fetch('https://backend-c10yefh44-paolos-projects-dc6990da.vercel.app/api/auth/verify', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        // Update user data in localStorage
+        localStorage.setItem("user_data", JSON.stringify(data.user));
+        return true;
+      } else {
+        // Token is invalid, remove it
+        localStorage.removeItem('auth_token');
+        localStorage.removeItem('user_data');
+        return false;
+      }
+    } catch (error) {
+      console.error('Token verification failed:', error);
+      // Don't remove demo tokens on network errors
+      if (!token.startsWith('demo-')) {
+        localStorage.removeItem('auth_token');
+        localStorage.removeItem('user_data');
+      }
+      return token.startsWith('demo-'); // Allow demo tokens to work offline
+    }
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('auth_token');
+    localStorage.removeItem('user_data');
+    setIsAuthenticated(false);
+  };
   
   useEffect(() => {
-    // Check if user is authenticated - simple check for production demo
-    const token = localStorage.getItem('auth_token');
-    setIsAuthenticated(!!token);
+    const checkAuth = async () => {
+      const token = localStorage.getItem('auth_token');
+      
+      if (token) {
+        const isValid = await verifyToken(token);
+        setIsAuthenticated(isValid);
+      } else {
+        setIsAuthenticated(false);
+      }
+      
+      setAuthLoading(false);
+    };
+
+    checkAuth();
   }, []);
+
+  // Show loading spinner while checking authentication
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <BrowserRouter>
@@ -51,7 +120,7 @@ function App() {
           </Routes>
         ) : (
           // Protected Routes (With Layout)
-          <Layout>
+          <Layout onLogout={handleLogout}>
             <Routes>
               <Route path="/" element={<Dashboard />} />
               <Route path="/dashboard" element={<Dashboard />} />

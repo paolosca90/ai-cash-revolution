@@ -2,14 +2,29 @@ import { NavLink, useNavigate } from "react-router-dom";
 import { Home, CandlestickChart, History, Settings, CreditCard, Brain, BookOpen, Newspaper, LogOut, Download } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { useToast } from "@/components/ui/use-toast";
 
-const Nav = () => {
+interface NavProps {
+  onLogout?: () => void;
+}
+
+const Nav: React.FC<NavProps> = ({ onLogout }) => {
   const navigate = useNavigate();
+  const { toast } = useToast();
   
   const handleLogout = () => {
-    localStorage.removeItem('auth_token');
-    localStorage.removeItem('user_email');
-    window.location.href = '/';
+    if (onLogout) {
+      onLogout();
+      toast({
+        title: "Logged out successfully",
+        description: "You have been logged out of your account."
+      });
+    } else {
+      // Fallback for older logout logic
+      localStorage.removeItem('auth_token');
+      localStorage.removeItem('user_data');
+      window.location.href = '/';
+    }
   };
   
   const navItems = [

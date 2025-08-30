@@ -1,0 +1,39 @@
+{
+  "mt5_bridge": {
+    "status": "DISCONNECTED",
+    "tests": {
+      "health": {
+        "status": 404,
+        "response": null
+      },
+      "mt5_status": {
+        "status": 200,
+        "connected": false,
+        "response": {
+          "account": null,
+          "connected": false,
+          "timestamp": true
+        }
+      }
+    }
+  },
+  "express_backend": {
+    "status": "BLOCKED_BY_AUTH",
+    "tests": {
+      "health": {
+        "status": 401,
+        "error": "Vercel Authentication Protection enabled"
+      }
+    }
+  },
+  "integration": {
+    "status": "SKIPPED_MT5_DISCONNECTED",
+    "tests": {
+      "prerequisites": {
+        "mt5_bridge_connected": false,
+        "express_backend_healthy": false
+      }
+    }
+  },
+  "timestamp": "2025-08-30T22:11:02.131947"
+}

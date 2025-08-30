@@ -110,13 +110,16 @@ const Subscribe: React.FC = () => {
         // Successo - mostra conferma e reindirizza
         alert(`✅ Abbonamento attivato! VPS sarà pronto in ${result.vps?.estimated_ready || '10-15 minuti'}`);
         
-        // Salva dati utente
+        // Salva dati utente E token di autenticazione
+        localStorage.setItem('auth_token', result.auth_token || 'demo-token-subscription');
         localStorage.setItem('user_data', JSON.stringify({
           id: result.user.id,
           email: result.user.email,
-          plan: result.user.plan
+          plan: result.user.plan,
+          subscription_active: true
         }));
         
+        // Force page refresh to trigger authentication check
         window.location.href = '/dashboard?welcome=true&payment=success';
       } else {
         throw new Error(result.error);
@@ -484,11 +487,18 @@ const Subscribe: React.FC = () => {
               
               <Button 
                 onClick={() => {
-                  // Simulate payment success
+                  // Simulate payment success with proper authentication
                   localStorage.setItem("auth_token", "demo-token-subscription");
-                  localStorage.setItem("user_email", formData.email);
-                  localStorage.setItem("subscription_plan", selectedPlan);
-                  navigate('/dashboard');
+                  localStorage.setItem('user_data', JSON.stringify({
+                    id: `demo-${Date.now()}`,
+                    email: formData.email,
+                    full_name: formData.full_name,
+                    plan: selectedPlan,
+                    subscription_active: true,
+                    mt5_configured: true
+                  }));
+                  // Force full page reload to trigger authentication check
+                  window.location.href = '/dashboard?welcome=true&payment=demo';
                 }}
                 className="w-full bg-green-600 hover:bg-green-700"
                 size="lg"

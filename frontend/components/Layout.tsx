@@ -4,9 +4,10 @@ import Header from "./Header";
 
 interface LayoutProps {
   children: React.ReactNode;
+  onLogout?: () => void;
 }
 
-const Layout: React.FC<LayoutProps> = ({ children }) => {
+const Layout: React.FC<LayoutProps> = ({ children, onLogout }) => {
   return (
     <div className="grid min-h-screen w-full md:grid-cols-[220px_1fr] lg:grid-cols-[280px_1fr]">
       <div className="hidden border-r bg-muted/40 md:block">
@@ -18,12 +19,12 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             </a>
           </div>
           <div className="flex-1">
-            <Nav />
+            <Nav onLogout={onLogout} />
           </div>
         </div>
       </div>
       <div className="flex flex-col">
-        <Header />
+        <Header onLogout={onLogout} />
         <main className="flex flex-1 flex-col gap-4 p-4 lg:gap-6 lg:p-6 bg-background">
           {children}
         </main>

@@ -44,20 +44,51 @@ export default function Login({ onLogin }: LoginProps) {
     setLoading(true);
     setError("");
 
-    // Demo login - accept any credentials
-    setTimeout(() => {
-      localStorage.setItem("auth_token", "demo-token-12345");
-      localStorage.setItem("user_email", formData.email);
+    try {
+      // FORCE production URL - override any environment settings
+      const baseURL = 'https://backend-c10yefh44-paolos-projects-dc6990da.vercel.app';
+      
+      const response = await fetch(`${baseURL}/api/auth/login`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: formData.email,
+          password: formData.password
+        })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Login failed');
+      }
+
+      // Store authentication data in Supabase format
+      if (data.success && data.token) {
+        localStorage.setItem("supabase.auth.token", data.token);
+        localStorage.setItem("auth_token", data.token);
+        localStorage.setItem("user_data", JSON.stringify(data.user));
+        if (data.refreshToken) {
+          localStorage.setItem("supabase.auth.refresh_token", data.refreshToken);
+        }
+      }
       
       toast({
         title: "🎉 Login Successful!",
-        description: `Welcome to AI Trading Boost!`
+        description: `Welcome back, ${data.user.name}!`
       });
 
       setLoading(false);
       onLogin();
       navigate("/dashboard");
-    }, 1000);
+
+    } catch (error) {
+      console.error('Login error:', error);
+      setError(error instanceof Error ? error.message : 'Login failed. Please try again.');
+      setLoading(false);
+    }
   };
 
   return (
@@ -169,7 +200,7 @@ export default function Login({ onLogin }: LoginProps) {
 
               {/* Demo Notice */}
               <div className="bg-blue-50 p-3 rounded-lg text-sm text-blue-700">
-                <strong>Demo:</strong> Usa qualsiasi email e password per testare la piattaforma
+                <strong>Demo:</strong> Create an account first to login, or use test@example.com / test123456
               </div>
 
               {/* Sign In Button */}

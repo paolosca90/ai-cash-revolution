@@ -28,6 +28,8 @@ interface MT5Config {
   password: string;
   server: string;
   broker: string;
+  host: string;
+  port: number;
 }
 
 export default function MT5Setup() {
@@ -49,10 +51,12 @@ export default function MT5Setup() {
     login: savedConfig?.login || "",
     password: savedConfig?.password || "",
     server: savedConfig?.server || "",
-    broker: savedConfig?.broker || ""
+    broker: savedConfig?.broker || "Demo",
+    host: savedConfig?.host || "localhost",
+    port: savedConfig?.port || 8080
   });
 
-  const handleConfigChange = (field: keyof MT5Config, value: string) => {
+  const handleConfigChange = (field: keyof MT5Config, value: string | number) => {
     setConfig(prev => ({ ...prev, [field]: value }));
   };
 
@@ -443,6 +447,35 @@ export default function MT5Setup() {
             </div>
           </div>
 
+          <div className="grid md:grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="host">Host Bridge Server</Label>
+              <Input
+                id="host"
+                placeholder="es. localhost o 192.168.1.100"
+                value={config.host}
+                onChange={(e) => handleConfigChange('host', e.target.value)}
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                IP/hostname del PC con il bridge Python
+              </p>
+            </div>
+            
+            <div>
+              <Label htmlFor="port">Port</Label>
+              <Input
+                id="port"
+                type="number"
+                placeholder="8080"
+                value={config.port}
+                onChange={(e) => handleConfigChange('port', parseInt(e.target.value) || 8080)}
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                Porta del bridge server (default: 8080)
+              </p>
+            </div>
+          </div>
+
           {/* Real MT5 Connection Status */}
           {isConnected && mt5Status?.accountInfo && (
             <Alert className="bg-green-50 border-green-200">
@@ -468,7 +501,7 @@ export default function MT5Setup() {
           <div className="flex gap-3">
             <Button 
               onClick={handleTestConnection}
-              disabled={isValidating || !config.login}
+              disabled={isValidating || !config.login || !config.server || !config.host}
               className="flex-1"
             >
               {isValidating ? 'Testando...' : 'Testa Connessione MT5'}
