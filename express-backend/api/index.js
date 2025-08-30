@@ -3,8 +3,34 @@ const cors = require('cors');
 
 const app = express();
 
+// CORS configuration for Vercel deployment
+const corsOptions = {
+  origin: [
+    'https://ai-cash-revolution-frontend.vercel.app',
+    'https://ai-cash-revolution.vercel.app',
+    'https://ai-money-generator-main.vercel.app',
+    'http://localhost:5173',
+    'http://localhost:3000',
+    'http://localhost:3001'
+  ],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: [
+    'Content-Type', 
+    'Authorization', 
+    'X-Requested-With',
+    'Accept',
+    'Origin'
+  ],
+  credentials: true,
+  optionsSuccessStatus: 200 // For legacy browser support
+};
+
 // Middleware
-app.use(cors());
+app.use(cors(corsOptions));
+
+// Handle preflight requests explicitly
+app.options('*', cors(corsOptions));
+
 app.use(express.json());
 
 // Routes

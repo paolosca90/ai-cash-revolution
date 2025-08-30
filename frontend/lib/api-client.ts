@@ -7,7 +7,7 @@ export class ApiClient {
     this.baseURL = import.meta.env.VITE_API_URL || 
       (import.meta.env.PROD 
         ? 'https://ai-cash-revolution-backend-nkcdzubal-paolos-projects-dc6990da.vercel.app' 
-        : 'http://localhost:3001');
+        : 'http://localhost:3002');
   }
 
   private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
@@ -81,21 +81,32 @@ export class ApiClient {
     } catch (error) {
       console.error(`API request failed: ${endpoint}`, error);
       
-      // In production, provide mock data instead of failing
+      // Enhanced CORS error detection
+      if (error instanceof TypeError && 
+          (error.message.includes('fetch') || 
+           error.message.includes('Failed to fetch') ||
+           error.message.includes('CORS') ||
+           error.message.includes('Network request failed'))) {
+        
+        console.warn(`CORS/Network error detected for ${endpoint}. This may be due to backend configuration issues.`);
+        
+        // In production, provide mock data instead of failing
+        if (import.meta.env.PROD) {
+          console.warn('Using mock data due to CORS/network error in production.');
+          return this.getMockResponse(endpoint, options.method || 'GET') as T;
+        }
+        
+        // In development, provide helpful error message
+        throw new Error(`CORS/Network error: Unable to connect to ${this.baseURL}${endpoint}. Please check:\n1. Backend server is running\n2. CORS is properly configured\n3. Network connection is stable`);
+      }
+      
+      // In production, provide mock data for any error
       if (import.meta.env.PROD) {
         console.warn('API request failed in production. Using mock data for demo.');
         return this.getMockResponse(endpoint, options.method || 'GET') as T;
       }
       
-      // Provide more specific error messages for common issues
-      if (error instanceof TypeError && error.message.includes('fetch')) {
-        throw new Error('Network error: Unable to connect to the server. Please check your internet connection and try again.');
-      }
-      
-      if (error instanceof Error && error.message.includes('CORS')) {
-        throw new Error('CORS error: The server is not configured to accept requests from this domain.');
-      }
-      
+      // Re-throw other errors in development
       throw error;
     }
   }
