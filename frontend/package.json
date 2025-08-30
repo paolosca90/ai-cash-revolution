@@ -8,7 +8,9 @@
     "build": "vite build",
     "preview": "vite preview",
     "lint": "echo 'Linting skipped'",
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit",
+    "build-prod": "vite build --mode production",
+    "deploy": "vite build --mode production && echo '✅ Build completato e pronto per deploy su Vercel!'"
   },
   "dependencies": {
     "@hookform/resolvers": "^4.1.3",
