@@ -3,29 +3,47 @@
 	"compilerOptions": {
 		/* Basic Options */
 		"lib": ["ES2022"],
-		"target": "ES2022",
-		"module": "ES2022",
+		"target": "ES2020",
+		"module": "ESNext",
 		"types": ["node"],
-		"paths": {
-			"~encore/*": ["./encore.gen/*"]
-		},
+		"outDir": "./dist",
+		"rootDir": "./",
 
 		/* Workspace Settings */
-		"composite": true,
+		"composite": false,
 
 		/* Strict Type-Checking Options */
 		"strict": true,
 
 		/* Module Resolution Options */
-		"moduleResolution": "bundler",
+		"moduleResolution": "node",
 		"allowSyntheticDefaultImports": true,
+		"esModuleInterop": true,
 		"isolatedModules": true,
 		"sourceMap": true,
 
-		"declaration": true,
+		"declaration": false,
 
 		/* Advanced Options */
 		"forceConsistentCasingInFileNames": true,
-		"skipLibCheck": true
-	}
+		"skipLibCheck": true,
+		"resolveJsonModule": true
+	},
+	"include": [
+		"src/**/*"
+	],
+	"exclude": [
+		"node_modules",
+		"dist",
+		"**/*.test.ts",
+		"ml/**/*",
+		"analysis/**/*",
+		"user/**/*",
+		"trading/**/*",
+		"data_enrichment/**/*",
+		"scheduler/**/*",
+		"subscription/**/*",
+		"payments/**/*",
+		"admin/**/*"
+	]
 }

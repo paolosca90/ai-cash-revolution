@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Badge } from '../components/ui/badge';
-import { Check, Zap, Shield, Headphones, TrendingUp } from 'lucide-react';
-import StripePaymentForm from '../components/StripePaymentForm';
+import { Check, Zap, Shield, Headphones, TrendingUp, ArrowLeft } from 'lucide-react';
 
 interface SubscriptionPlan {
   id: string;
@@ -50,6 +50,7 @@ const PLANS: SubscriptionPlan[] = [
 ];
 
 const Subscribe: React.FC = () => {
+  const navigate = useNavigate();
   const [selectedPlan, setSelectedPlan] = useState<string>('professional');
   const [isLoading, setIsLoading] = useState(false);
   const [step, setStep] = useState(1); // 1: Plan selection, 2: User details, 3: MT5 config, 4: Payment
@@ -168,6 +169,18 @@ const Subscribe: React.FC = () => {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 py-12">
         <div className="container mx-auto px-4">
+          {/* Back to Home */}
+          <div className="mb-8">
+            <Button 
+              variant="ghost" 
+              onClick={() => navigate("/")}
+              className="text-gray-600 hover:text-gray-900"
+            >
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Torna alla Home
+            </Button>
+          </div>
+          
           <div className="text-center mb-12">
             <h1 className="text-4xl font-bold text-gray-900 mb-4">
               Inizia il Tuo Trading Automatico
@@ -183,7 +196,7 @@ const Subscribe: React.FC = () => {
             ))}
           </div>
 
-          <div className="text-center mt-8">
+          <div className="text-center mt-8 space-y-4">
             <Button 
               onClick={() => setStep(2)} 
               size="lg" 
@@ -191,9 +204,34 @@ const Subscribe: React.FC = () => {
             >
               Continua con {PLANS.find(p => p.id === selectedPlan)?.name}
             </Button>
-            <p className="text-sm text-gray-500 mt-2">
-              Garanzia 30 giorni soddisfatti o rimborsati
-            </p>
+            
+            <div className="text-center">
+              <p className="text-sm text-gray-500 mb-3">
+                Garanzia 30 giorni soddisfatti o rimborsati
+              </p>
+              
+              <div className="border-t pt-6">
+                <p className="text-sm text-gray-600 mb-3">
+                  Vuoi testare la piattaforma prima di abbonarti?
+                </p>
+                <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                  <Button 
+                    variant="outline"
+                    onClick={() => navigate('/login')}
+                    className="px-6"
+                  >
+                    Accedi alla Demo Gratuita
+                  </Button>
+                  <Button 
+                    variant="ghost"
+                    onClick={() => navigate('/register')}
+                    className="px-6"
+                  >
+                    Crea Account Demo
+                  </Button>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -435,19 +473,29 @@ const Subscribe: React.FC = () => {
               </div>
             </div>
 
-            {/* Stripe Payment Form */}
-            <StripePaymentForm 
-              paymentData={{
-                email: formData.email,
-                full_name: formData.full_name,
-                phone: formData.phone,
-                plan_name: selectedPlanDetails.name,
-                amount: selectedPlanDetails.price
-              }}
-              onPaymentSuccess={handleSubscribe}
-              onPaymentError={(error) => alert(`Errore pagamento: ${error}`)}
-              isLoading={isLoading}
-            />
+            {/* Demo Payment Form */}
+            <div className="space-y-4">
+              <div className="bg-blue-50 p-4 rounded-lg text-center">
+                <p className="text-blue-700 font-medium">Demo Mode</p>
+                <p className="text-sm text-blue-600">
+                  Clicca per simulare il pagamento e accedere alla piattaforma
+                </p>
+              </div>
+              
+              <Button 
+                onClick={() => {
+                  // Simulate payment success
+                  localStorage.setItem("auth_token", "demo-token-subscription");
+                  localStorage.setItem("user_email", formData.email);
+                  localStorage.setItem("subscription_plan", selectedPlan);
+                  navigate('/dashboard');
+                }}
+                className="w-full bg-green-600 hover:bg-green-700"
+                size="lg"
+              >
+                Simula Pagamento e Accedi
+              </Button>
+            </div>
 
             <div className="flex gap-4 mt-4">
               <Button variant="outline" onClick={() => setStep(3)} disabled={isLoading}>

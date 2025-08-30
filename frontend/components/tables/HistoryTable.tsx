@@ -32,27 +32,27 @@ const HistoryTable: React.FC<HistoryTableProps> = ({ signals, isLoading }) => {
       <TableBody>
         {signals.map((signal) => {
           // Safely access nested properties with fallbacks
-          const createdAt = signal.analysis?.createdAt || new Date().toISOString();
-          const executionPrice = signal.analysis?.executionPrice;
-          const profitLoss = signal.analysis?.profitLoss;
-          const status = signal.analysis?.status || 'pending';
+          const createdAt = signal.createdAt || new Date().toISOString();
+          const executionPrice = signal.takeProfit || signal.entryPrice; // Fallback for demo
+          const profitLoss = signal.profit || 0; // Fallback for demo
+          const status = signal.status || 'closed';
           
           return (
-            <TableRow key={signal.tradeId}>
+            <TableRow key={signal.tradeId || signal.id}>
               <TableCell>{new Date(createdAt).toLocaleString()}</TableCell>
               <TableCell>{signal.symbol}</TableCell>
               <TableCell>
                 <Badge variant={signal.direction === "LONG" ? "default" : "destructive"}>
-                  {signal.direction}
+                  {signal.direction === "LONG" ? "BUY" : "SELL"}
                 </Badge>
               </TableCell>
-              <TableCell>{signal.entryPrice.toFixed(5)}</TableCell>
-              <TableCell>{executionPrice ? executionPrice.toFixed(5) : "-"}</TableCell>
-              <TableCell className={profitLoss && profitLoss > 0 ? "text-green-500" : profitLoss && profitLoss < 0 ? "text-red-500" : ""}>
-                {profitLoss !== null && profitLoss !== undefined ? profitLoss.toFixed(2) : "-"}
+              <TableCell>{signal.entryPrice?.toFixed(5) || "0.00000"}</TableCell>
+              <TableCell>{executionPrice?.toFixed(5) || "-"}</TableCell>
+              <TableCell className={profitLoss > 0 ? "text-green-500" : profitLoss < 0 ? "text-red-500" : ""}>
+                {profitLoss !== null && profitLoss !== undefined ? `${profitLoss.toFixed(2)}` : "-"}
               </TableCell>
               <TableCell>
-                <Badge variant="secondary">{status}</Badge>
+                <Badge variant={status === 'closed' ? "secondary" : "default"}>{status}</Badge>
               </TableCell>
             </TableRow>
           );

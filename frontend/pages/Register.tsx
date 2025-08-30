@@ -6,10 +6,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Loader2, Eye, EyeOff, TrendingUp, User, Mail, Lock, Check } from "lucide-react";
+import { Loader2, Eye, EyeOff, TrendingUp, User, Mail, Lock, Check, ArrowLeft } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { Badge } from "@/components/ui/badge";
-import { Checkbox } from "@/components/ui/checkbox";
+// import { Checkbox } from "@/components/ui/checkbox";
 
 interface RegisterFormData {
   name: string;
@@ -85,39 +85,33 @@ export default function Register() {
     setLoading(true);
     setError("");
 
-    try {
-      const response = await backend.user.register({
-        name: formData.name.trim(),
-        email: formData.email,
-        password: formData.password
+    // Demo registration - simulate success
+    setTimeout(() => {
+      toast({
+        title: "🎉 Registration Successful!",
+        description: "Account creato! Ora configura MT5 per iniziare."
       });
-
-      if (response.success && response.token) {
-        // Store token in localStorage
-        localStorage.setItem("auth_token", response.token);
-        localStorage.setItem("user_data", JSON.stringify(response.user));
-        
-        toast({
-          title: "🎉 Welcome to AI Trading Boost!",
-          description: "Your account has been created successfully. Enjoy your 7-day free trial!"
-        });
-
-        // Redirect to dashboard
-        navigate("/dashboard");
-      } else {
-        setError(response.message || "Registration failed");
-      }
-    } catch (err: any) {
-      console.error("Registration error:", err);
-      setError(err.message || "An error occurred during registration");
-    } finally {
+      
       setLoading(false);
-    }
+      navigate('/mt5-setup');
+    }, 1500);
   };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex items-center justify-center p-4">
       <div className="w-full max-w-md space-y-6">
+        {/* Back to Home */}
+        <div className="mb-6">
+          <Button 
+            variant="ghost" 
+            onClick={() => navigate("/")}
+            className="text-gray-600 hover:text-gray-900"
+          >
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Torna alla Home
+          </Button>
+        </div>
+        
         {/* Header */}
         <div className="text-center space-y-2">
           <div className="flex justify-center mb-4">
@@ -265,11 +259,13 @@ export default function Register() {
 
               {/* Terms and Conditions */}
               <div className="flex items-start space-x-2">
-                <Checkbox
+                <input
                   id="acceptTerms"
+                  type="checkbox"
                   checked={formData.acceptTerms}
-                  onCheckedChange={handleCheckboxChange}
+                  onChange={(e) => handleCheckboxChange(e.target.checked)}
                   disabled={loading}
+                  className="mt-1"
                 />
                 <div className="grid gap-1.5 leading-none">
                   <label

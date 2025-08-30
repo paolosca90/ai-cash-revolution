@@ -85,3 +85,4 @@ jspm_packages/
 
 # Claude Code specific
 .claude/settings.local.json
+.vercel

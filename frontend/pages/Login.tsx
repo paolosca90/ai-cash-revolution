@@ -1,12 +1,11 @@
 import React, { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import { useBackend } from "../hooks/useBackend";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Loader2, Eye, EyeOff, TrendingUp, Lock, Mail } from "lucide-react";
+import { Loader2, Eye, EyeOff, TrendingUp, Lock, Mail, ArrowLeft } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { Badge } from "@/components/ui/badge";
 
@@ -15,7 +14,11 @@ interface LoginFormData {
   password: string;
 }
 
-export default function Login() {
+interface LoginProps {
+  onLogin: () => void;
+}
+
+export default function Login({ onLogin }: LoginProps) {
   const [formData, setFormData] = useState<LoginFormData>({
     email: "",
     password: ""
@@ -25,7 +28,6 @@ export default function Login() {
   const [showPassword, setShowPassword] = useState(false);
   
   const navigate = useNavigate();
-  const backend = useBackend();
   const { toast } = useToast();
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -42,38 +44,37 @@ export default function Login() {
     setLoading(true);
     setError("");
 
-    try {
-      const response = await backend.user.login({
-        email: formData.email,
-        password: formData.password
+    // Demo login - accept any credentials
+    setTimeout(() => {
+      localStorage.setItem("auth_token", "demo-token-12345");
+      localStorage.setItem("user_email", formData.email);
+      
+      toast({
+        title: "🎉 Login Successful!",
+        description: `Welcome to AI Trading Boost!`
       });
 
-      if (response.success && response.token) {
-        // Store token in localStorage
-        localStorage.setItem("auth_token", response.token);
-        localStorage.setItem("user_data", JSON.stringify(response.user));
-        
-        toast({
-          title: "🎉 Login Successful!",
-          description: `Welcome back, ${response.user?.name}!`
-        });
-
-        // Redirect to dashboard
-        navigate("/dashboard");
-      } else {
-        setError(response.message || "Login failed");
-      }
-    } catch (err: any) {
-      console.error("Login error:", err);
-      setError(err.message || "An error occurred during login");
-    } finally {
       setLoading(false);
-    }
+      onLogin();
+      navigate("/dashboard");
+    }, 1000);
   };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex items-center justify-center p-4">
       <div className="w-full max-w-md space-y-6">
+        {/* Back to Home */}
+        <div className="mb-6">
+          <Button 
+            variant="ghost" 
+            onClick={() => navigate("/")}
+            className="text-gray-600 hover:text-gray-900"
+          >
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Torna alla Home
+          </Button>
+        </div>
+        
         {/* Header */}
         <div className="text-center space-y-2">
           <div className="flex justify-center mb-4">
@@ -128,7 +129,7 @@ export default function Login() {
                     name="email"
                     type="email"
                     required
-                    placeholder="Enter your email"
+                    placeholder="demo@tradingai.com"
                     value={formData.email}
                     onChange={handleInputChange}
                     className="pl-10 h-12"
@@ -149,7 +150,7 @@ export default function Login() {
                     name="password"
                     type={showPassword ? "text" : "password"}
                     required
-                    placeholder="Enter your password"
+                    placeholder="demo123"
                     value={formData.password}
                     onChange={handleInputChange}
                     className="pl-10 pr-10 h-12"
@@ -164,6 +165,11 @@ export default function Login() {
                     {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                   </button>
                 </div>
+              </div>
+
+              {/* Demo Notice */}
+              <div className="bg-blue-50 p-3 rounded-lg text-sm text-blue-700">
+                <strong>Demo:</strong> Usa qualsiasi email e password per testare la piattaforma
               </div>
 
               {/* Sign In Button */}

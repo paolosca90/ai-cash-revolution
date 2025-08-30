@@ -93,20 +93,20 @@ export default function Landing() {
                 <Button 
                   size="lg" 
                   className="bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-lg py-6 px-8 rounded-xl"
-                  onClick={() => navigate('/trade')}
+                  onClick={() => navigate('/login')}
                 >
                   <Rocket className="h-5 w-5 mr-2" />
-                  Inizia a Tradare
+                  Accedi alla Demo
                   <ArrowRight className="h-5 w-5 ml-2" />
                 </Button>
                 <Button 
                   size="lg" 
                   variant="outline" 
                   className="border-white/30 text-white hover:bg-white/10 text-lg py-6 px-8 rounded-xl"
-                  onClick={() => navigate('/demo')}
+                  onClick={() => navigate('/subscribe')}
                 >
                   <Play className="h-5 w-5 mr-2" />
-                  Guarda Demo
+                  Vedi Piani
                 </Button>
               </div>
               
@@ -164,6 +164,76 @@ export default function Landing() {
                   </div>
                 </CardContent>
               </Card>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* How It Works Section */}
+      <section className="py-20 bg-gray-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center max-w-3xl mx-auto mb-16">
+            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
+              Come Funziona in 3 Semplici Passi
+            </h2>
+            <p className="text-xl text-gray-600">
+              Dal setup alla prima operazione in meno di 10 minuti
+            </p>
+          </div>
+          
+          <div className="grid md:grid-cols-3 gap-8">
+            <div className="text-center">
+              <div className="w-20 h-20 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-full flex items-center justify-center mx-auto mb-6">
+                <span className="text-2xl font-bold text-white">1</span>
+              </div>
+              <h3 className="text-xl font-semibold text-gray-900 mb-3">Registrati e Accedi</h3>
+              <p className="text-gray-600 mb-4">
+                Crea il tuo account gratuito e accedi alla piattaforma demo. 
+                Nessuna carta di credito richiesta per iniziare.
+              </p>
+              <Button 
+                variant="outline" 
+                onClick={() => navigate('/register')}
+                className="text-blue-600 border-blue-200 hover:bg-blue-50"
+              >
+                Registrati Ora
+              </Button>
+            </div>
+            
+            <div className="text-center">
+              <div className="w-20 h-20 bg-gradient-to-br from-green-500 to-emerald-500 rounded-full flex items-center justify-center mx-auto mb-6">
+                <span className="text-2xl font-bold text-white">2</span>
+              </div>
+              <h3 className="text-xl font-semibold text-gray-900 mb-3">Connetti MT5</h3>
+              <p className="text-gray-600 mb-4">
+                Collega il tuo account MetaTrader 5 (demo o reale) seguendo 
+                la nostra guida passo-passo integrata.
+              </p>
+              <Button 
+                variant="outline" 
+                onClick={() => navigate('/mt5-setup')}
+                className="text-green-600 border-green-200 hover:bg-green-50"
+              >
+                Vedi Guida MT5
+              </Button>
+            </div>
+            
+            <div className="text-center">
+              <div className="w-20 h-20 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center mx-auto mb-6">
+                <span className="text-2xl font-bold text-white">3</span>
+              </div>
+              <h3 className="text-xl font-semibold text-gray-900 mb-3">Trading Automatico</h3>
+              <p className="text-gray-600 mb-4">
+                Attiva l'AI e inizia a ricevere segnali automatici. 
+                Monitora tutto dalla dashboard in tempo reale.
+              </p>
+              <Button 
+                variant="outline" 
+                onClick={() => navigate('/login')}
+                className="text-purple-600 border-purple-200 hover:bg-purple-50"
+              >
+                Inizia Demo
+              </Button>
             </div>
           </div>
         </div>
@@ -347,19 +417,19 @@ export default function Landing() {
             <Button 
               size="lg" 
               className="bg-white text-blue-900 hover:bg-blue-50 text-lg py-6 px-8 rounded-xl font-bold"
-              onClick={() => navigate('/signup')}
+              onClick={() => navigate('/login')}
             >
               <Rocket className="h-5 w-5 mr-2" />
-              Inizia Gratis (14 giorni)
+              Prova Demo Gratuita
             </Button>
             <Button 
               size="lg" 
               variant="outline" 
               className="border-white text-white hover:bg-white/10 text-lg py-6 px-8 rounded-xl"
-              onClick={() => navigate('/contact')}
+              onClick={() => navigate('/subscribe')}
             >
               <Users className="h-5 w-5 mr-2" />
-              Prenota Demo Personale
+              Vedi Piani e Prezzi
             </Button>
           </div>
           

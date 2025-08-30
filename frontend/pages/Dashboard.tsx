@@ -1,8 +1,9 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useBackend } from "../hooks/useBackend";
+import { useMT5Connection } from "../hooks/useMT5Connection";
 import StatCard from "../components/cards/StatCard";
 import AutoSignalCard from "../components/cards/AutoSignalCard";
-import { DollarSign, Percent, TrendingUp, TrendingDown, Zap, BarChart, Brain, Target, Activity, AlertCircle, Award, Shield, Sparkles, RefreshCw, Clock, Database } from "lucide-react";
+import { DollarSign, Percent, TrendingUp, TrendingDown, Zap, BarChart, Brain, Target, Activity, AlertCircle, Award, Shield, Sparkles, RefreshCw, Clock, Database, Settings, ExternalLink, Wifi, WifiOff } from "lucide-react";
 import PositionsTable from "../components/tables/PositionsTable";
 import HistoryTable from "../components/tables/HistoryTable";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -17,6 +18,17 @@ export default function Dashboard() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
+
+  // Real MT5 connection management
+  const {
+    isConnected: isMT5Connected,
+    isValidating: isMT5Validating,
+    mt5Status,
+    config: mt5Config,
+    needsSetup,
+    statusMessage,
+    recheckStatus
+  } = useMT5Connection();
 
   const { data: topSignalsData, isLoading: isLoadingTopSignals, error: topSignalsError, refetch: refetchTopSignals } = useQuery({
     queryKey: ["topSignals"],
@@ -185,26 +197,26 @@ export default function Dashboard() {
   const mlStats = [
     { 
       title: "ML Accuracy", 
-      value: `${(mlAnalytics?.modelPerformance.accuracy * 100)?.toFixed(1) || 0}%`, 
+      value: `${((mlAnalytics?.modelPerformance?.accuracy || 0) * 100)?.toFixed(1) || 0}%`, 
       icon: Brain, 
       description: "Accuratezza del modello ML",
-      color: (mlAnalytics?.modelPerformance.accuracy || 0) >= 0.8 ? "text-green-600" : "text-yellow-600"
+      color: (mlAnalytics?.modelPerformance?.accuracy || 0) >= 0.8 ? "text-green-600" : "text-yellow-600"
     },
     { 
       title: "Precision", 
-      value: `${(mlAnalytics?.modelPerformance.precision * 100)?.toFixed(1) || 0}%`, 
+      value: `${((mlAnalytics?.modelPerformance?.precision || 0) * 100)?.toFixed(1) || 0}%`, 
       icon: Target, 
       description: "Precisione delle predizioni"
     },
     { 
       title: "F1 Score", 
-      value: `${(mlAnalytics?.modelPerformance.f1Score * 100)?.toFixed(1) || 0}%`, 
+      value: `${((mlAnalytics?.modelPerformance?.f1Score || 0) * 100)?.toFixed(1) || 0}%`, 
       icon: Activity, 
       description: "Bilanciamento precision/recall"
     },
     { 
       title: "Predizioni", 
-      value: mlAnalytics?.predictionStats.totalPredictions?.toString() || "0", 
+      value: mlAnalytics?.predictionStats?.totalPredictions?.toString() || "0", 
       icon: Zap, 
       description: "Numero totale di predizioni generate"
     },
@@ -243,14 +255,14 @@ export default function Dashboard() {
   ];
 
   // Prepare chart data
-  const performanceChartData = mlAnalytics?.performanceTimeline.map(pt => ({
+  const performanceChartData = (mlAnalytics?.performanceTimeline || []).map(pt => ({
     date: new Date(pt.date).toLocaleDateString(),
     accuracy: (pt.accuracy * 100).toFixed(1),
     profitLoss: pt.profitLoss.toFixed(0),
     predictions: pt.predictions
   })) || [];
 
-  const featureImportanceData = mlAnalytics?.featureImportance.slice(0, 8).map(f => ({
+  const featureImportanceData = (mlAnalytics?.featureImportance || []).slice(0, 8).map(f => ({
     feature: f.feature,
     importance: (f.importance * 100).toFixed(1),
     type: f.type
@@ -299,6 +311,118 @@ export default function Dashboard() {
           </Button>
         </div>
       </div>
+
+      {/* MT5 Connection Status - Real Implementation */}
+      {needsSetup ? (
+        <Card className="border-blue-200 bg-blue-50">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Settings className="h-5 w-5 text-blue-600" />
+                <div>
+                  <h4 className="font-semibold text-blue-800">Configura MT5</h4>
+                  <p className="text-sm text-blue-700">
+                    Per trading automatico, collega MetaTrader 5 con i tuoi dati account.
+                  </p>
+                </div>
+              </div>
+              <Button 
+                onClick={() => navigate('/mt5-setup')}
+                className="bg-blue-600 hover:bg-blue-700"
+              >
+                <Settings className="h-4 w-4 mr-2" />
+                Configura MT5
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      ) : isMT5Connected ? (
+        <Card className="border-green-200 bg-green-50">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="flex items-center">
+                  <Wifi className="h-5 w-5 text-green-600 mr-2" />
+                  <Badge className="bg-green-100 text-green-800 mr-3">LIVE</Badge>
+                </div>
+                <div>
+                  <h4 className="font-semibold text-green-800">MT5 Connesso e Attivo</h4>
+                  <p className="text-sm text-green-700">
+                    {mt5Status?.accountInfo?.name || mt5Config?.login} | 
+                    Saldo: ${mt5Status?.accountInfo?.balance?.toFixed(2) || '0.00'} | 
+                    Server: {mt5Config?.server}
+                  </p>
+                  {mt5Status?.lastUpdate && (
+                    <p className="text-xs text-green-600">
+                      Ultimo aggiornamento: {new Date(mt5Status.lastUpdate).toLocaleTimeString()}
+                    </p>
+                  )}
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <Button 
+                  onClick={recheckStatus}
+                  variant="outline"
+                  size="sm"
+                  disabled={isMT5Validating}
+                >
+                  <RefreshCw className={`h-4 w-4 mr-2 ${isMT5Validating ? 'animate-spin' : ''}`} />
+                  {isMT5Validating ? 'Verificando...' : 'Ricontrolla'}
+                </Button>
+                <Button 
+                  onClick={() => navigate('/mt5-setup')}
+                  variant="outline"
+                  size="sm"
+                >
+                  <Settings className="h-4 w-4 mr-2" />
+                  Modifica
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      ) : (
+        <Card className="border-red-200 bg-red-50">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="flex items-center">
+                  <WifiOff className="h-5 w-5 text-red-600 mr-2" />
+                  <Badge className="bg-red-100 text-red-800 mr-3">OFFLINE</Badge>
+                </div>
+                <div>
+                  <h4 className="font-semibold text-red-800">MT5 Disconnesso</h4>
+                  <p className="text-sm text-red-700">
+                    {statusMessage || 'MT5 non raggiungibile. Assicurati che sia attivo sul PC.'}
+                  </p>
+                  <p className="text-xs text-red-600 mt-1">
+                    Account configurato: {mt5Config?.login} ({mt5Config?.server})
+                  </p>
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <Button 
+                  onClick={recheckStatus}
+                  disabled={isMT5Validating}
+                  className="bg-red-600 hover:bg-red-700"
+                  size="sm"
+                >
+                  <RefreshCw className={`h-4 w-4 mr-2 ${isMT5Validating ? 'animate-spin' : ''}`} />
+                  {isMT5Validating ? 'Verificando...' : 'Riconnetti'}
+                </Button>
+                <Button 
+                  onClick={() => navigate('/mt5-setup')}
+                  variant="outline"
+                  size="sm"
+                >
+                  <Settings className="h-4 w-4 mr-2" />
+                  Configura
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* System Status Alert */}
       {!hasRealData && (
@@ -611,10 +735,10 @@ export default function Dashboard() {
               </div>
             ) : (
               <PositionsTable
-                positions={positionsData?.positions || []}
-                isLoading={isLoadingPositions}
-                onClose={() => { /* Implement close logic */ }}
-              />
+            positions={positionsData?.positions || []}
+            isLoading={isLoadingPositions}
+            onClose={() => { /* Implement close logic */ }}
+          />
             )}
           </CardContent>
         </Card>

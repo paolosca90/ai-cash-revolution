@@ -102,82 +102,15 @@ export default function MLDashboard() {
     detectPatternsMutation.mutate(selectedSymbol);
   };
 
-  // Generate realistic mock patterns based on symbol and count
-  const generateMockPatterns = (symbol: string, count: number) => {
-    const patternTypes = [
-      {
-        name: "Double Bottom",
-        type: "Reversal",
-        description: "Formazione di doppio minimo che indica potenziale inversione rialzista",
-        baseConfidence: 0.75,
-        baseReliability: 0.68,
-        baseSuccessRate: 0.72,
-        baseProfit: 180
-      },
-      {
-        name: "Bull Flag",
-        type: "Continuation",
-        description: "Pattern di continuazione che conferma il trend rialzista in corso",
-        baseConfidence: 0.82,
-        baseReliability: 0.75,
-        baseSuccessRate: 0.78,
-        baseProfit: 150
-      },
-      {
-        name: "Head and Shoulders",
-        type: "Reversal",
-        description: "Classica formazione di inversione che segnala cambio di trend",
-        baseConfidence: 0.70,
-        baseReliability: 0.65,
-        baseSuccessRate: 0.69,
-        baseProfit: 220
-      },
-      {
-        name: "Ascending Triangle",
-        type: "Continuation",
-        description: "Triangolo ascendente che indica accumulo e potenziale breakout",
-        baseConfidence: 0.78,
-        baseReliability: 0.72,
-        baseSuccessRate: 0.74,
-        baseProfit: 165
-      },
-      {
-        name: "Cup and Handle",
-        type: "Continuation",
-        description: "Pattern di consolidamento che precede spesso forti movimenti rialzisti",
-        baseConfidence: 0.85,
-        baseReliability: 0.80,
-        baseSuccessRate: 0.82,
-        baseProfit: 195
-      }
-    ];
-
-    // Symbol-specific adjustments
-    const symbolMultipliers: Record<string, { confidence: number; reliability: number; profit: number }> = {
-      "BTCUSD": { confidence: 1.1, reliability: 0.9, profit: 1.5 },
-      "ETHUSD": { confidence: 1.05, reliability: 0.95, profit: 1.3 },
-      "EURUSD": { confidence: 1.15, reliability: 1.1, profit: 0.8 },
-      "GBPUSD": { confidence: 1.0, reliability: 1.0, profit: 0.9 },
-      "XAUUSD": { confidence: 1.08, reliability: 1.05, profit: 1.2 },
-      "US500": { confidence: 1.12, reliability: 1.08, profit: 1.1 },
-      "NAS100": { confidence: 1.06, reliability: 1.02, profit: 1.25 }
-    };
-
-    const multiplier = symbolMultipliers[symbol] || { confidence: 1.0, reliability: 1.0, profit: 1.0 };
-
-    return patternTypes.slice(0, count).map((pattern, index) => {
-      const variance = (Math.random() - 0.5) * 0.2; // ±10% variance
-      
-      return {
-        name: pattern.name,
-        type: pattern.type,
-        description: pattern.description,
-        confidence: Math.min(0.95, Math.max(0.60, (pattern.baseConfidence + variance) * multiplier.confidence)),
-        reliability: Math.min(0.90, Math.max(0.50, (pattern.baseReliability + variance) * multiplier.reliability)),
-        successRate: Math.min(0.85, Math.max(0.55, (pattern.baseSuccessRate + variance))),
-        avgProfit: Math.round((pattern.baseProfit + (variance * 100)) * multiplier.profit)
-      };
-    });
+  // Helper function to get real pattern data from analytics
+  const getRealPatternData = async (symbol: string) => {
+    try {
+      const analytics = await backend.ml.getMLAnalytics();
+      return analytics?.recentPatterns?.filter((p: any) => p.symbol === symbol) || [];
+    } catch (error) {
+      console.error('Error getting real pattern data:', error);
+      return [];
+    }
   };
 
   const getPatternIcon = (type: string) => {

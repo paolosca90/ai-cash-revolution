@@ -38,9 +38,9 @@ export interface TradingSignal {
 }
 
 export interface MT5Position {
-  id: number;
+  ticket: number;
   symbol: string;
-  type: 'buy' | 'sell';
+  type: number; // 0 for BUY, 1 for SELL
   volume: number;
   openPrice: number;
   currentPrice: number;

@@ -6,21 +6,19 @@ import { TrendingUp, TrendingDown, Target, Shield, BarChart, Clock, Zap } from "
 import { useNavigate } from "react-router-dom";
 
 interface AutoSignal {
+  id: string;
   symbol: string;
-  direction: "LONG" | "SHORT";
+  action: "BUY" | "SELL";
+  direction?: "LONG" | "SHORT";
   confidence: number;
-  entryPrice: number;
-  takeProfit: number;
-  stopLoss: number;
-  riskRewardRatio: number;
+  price: number;
+  entryPrice?: number;
+  takeProfit?: number;
+  stopLoss?: number;
+  riskRewardRatio?: number;
   strategy: string;
-  timeframe: string;
-  analysis: {
-    rsi: number;
-    macd: number;
-    trend: string;
-    volatility: string;
-  };
+  timestamp: string;
+  createdAt?: string;
 }
 
 interface AutoSignalCardProps {
@@ -29,8 +27,14 @@ interface AutoSignalCardProps {
 
 const AutoSignalCard: React.FC<AutoSignalCardProps> = ({ signal }) => {
   const navigate = useNavigate();
-  const isLong = signal.direction === "LONG";
+  // Handle both action and direction properties
+  const action = signal.action || (signal.direction === "LONG" ? "BUY" : "SELL");
+  const isBuy = action === "BUY";
+  // Handle both price and entryPrice properties
+  const price = signal.price || signal.entryPrice || 0;
   const confidenceColor = signal.confidence > 85 ? "bg-green-500" : signal.confidence > 75 ? "bg-yellow-500" : "bg-red-500";
+  // Handle both timestamp and createdAt properties
+  const timestamp = signal.timestamp || signal.createdAt || new Date().toISOString();
 
   const handleTradeNow = () => {
     navigate('/trade', { state: { selectedSymbol: signal.symbol } });
@@ -54,12 +58,12 @@ const AutoSignalCard: React.FC<AutoSignalCardProps> = ({ signal }) => {
           <div className="flex items-center gap-2">
             <span className="text-lg">{getSymbolFlag(signal.symbol)}</span>
             <span className="font-bold">{signal.symbol}</span>
-            <Badge variant={isLong ? "default" : "destructive"} className="text-xs">
-              {signal.direction}
+            <Badge variant={isBuy ? "default" : "destructive"} className="text-xs">
+              {action}
             </Badge>
           </div>
           <div className="flex items-center gap-2">
-            {isLong ? <TrendingUp className="h-5 w-5 text-green-500" /> : <TrendingDown className="h-5 w-5 text-red-500" />}
+            {isBuy ? <TrendingUp className="h-5 w-5 text-green-500" /> : <TrendingDown className="h-5 w-5 text-red-500" />}
           </div>
         </CardTitle>
       </CardHeader>
@@ -79,24 +83,30 @@ const AutoSignalCard: React.FC<AutoSignalCardProps> = ({ signal }) => {
         <div className="grid grid-cols-2 gap-3 text-sm">
           <div className="flex items-center gap-2">
             <Target className="h-3 w-3 text-muted-foreground" />
-            <span>Entrata:</span>
-            <span className="font-mono text-xs">{signal.entryPrice.toFixed(5)}</span>
+            <span>Prezzo:</span>
+            <span className="font-mono text-xs">{price.toFixed(5)}</span>
           </div>
-          <div className="flex items-center gap-2">
-            <TrendingUp className="h-3 w-3 text-green-600" />
-            <span>TP:</span>
-            <span className="font-mono text-xs">{signal.takeProfit.toFixed(5)}</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <Shield className="h-3 w-3 text-red-600" />
-            <span>SL:</span>
-            <span className="font-mono text-xs">{signal.stopLoss.toFixed(5)}</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <BarChart className="h-3 w-3 text-muted-foreground" />
-            <span>R/R:</span>
-            <span className="font-mono text-xs">1:{signal.riskRewardRatio.toFixed(2)}</span>
-          </div>
+          {(signal.takeProfit || signal.takeProfit === 0) && (
+            <div className="flex items-center gap-2">
+              <TrendingUp className="h-3 w-3 text-green-600" />
+              <span>TP:</span>
+              <span className="font-mono text-xs">{signal.takeProfit.toFixed(5)}</span>
+            </div>
+          )}
+          {(signal.stopLoss || signal.stopLoss === 0) && (
+            <div className="flex items-center gap-2">
+              <Shield className="h-3 w-3 text-red-600" />
+              <span>SL:</span>
+              <span className="font-mono text-xs">{signal.stopLoss.toFixed(5)}</span>
+            </div>
+          )}
+          {signal.riskRewardRatio && (
+            <div className="flex items-center gap-2">
+              <BarChart className="h-3 w-3 text-muted-foreground" />
+              <span>R/R:</span>
+              <span className="font-mono text-xs">1:{signal.riskRewardRatio.toFixed(2)}</span>
+            </div>
+          )}
         </div>
 
         {/* Strategy and Analysis */}
@@ -106,18 +116,8 @@ const AutoSignalCard: React.FC<AutoSignalCardProps> = ({ signal }) => {
             <Badge variant="outline" className="text-xs">{signal.strategy}</Badge>
           </div>
           <div className="flex items-center justify-between text-xs">
-            <span>Timeframe:</span>
-            <span className="font-mono">{signal.timeframe}</span>
-          </div>
-          <div className="flex items-center justify-between text-xs">
-            <span>RSI:</span>
-            <span className={`font-mono ${signal.analysis.rsi > 70 ? 'text-red-600' : signal.analysis.rsi < 30 ? 'text-green-600' : 'text-muted-foreground'}`}>
-              {signal.analysis.rsi.toFixed(1)}
-            </span>
-          </div>
-          <div className="flex items-center justify-between text-xs">
-            <span>Trend:</span>
-            <span className="font-medium">{signal.analysis.trend}</span>
+            <span>Ora segnale:</span>
+            <span className="font-mono">{new Date(timestamp).toLocaleTimeString()}</span>
           </div>
         </div>
 
@@ -134,7 +134,7 @@ const AutoSignalCard: React.FC<AutoSignalCardProps> = ({ signal }) => {
         {/* Timestamp */}
         <div className="text-xs text-muted-foreground text-center">
           <Clock className="h-3 w-3 inline mr-1" />
-          Aggiornato: {new Date().toLocaleTimeString()}
+          Aggiornato: {new Date(timestamp).toLocaleTimeString()}
         </div>
       </CardContent>
     </Card>
