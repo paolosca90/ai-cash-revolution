@@ -234,7 +234,7 @@ export class ApiClient {
 
   async register(userData: {name: string, email: string, password: string}) {
     // Use real backend registration
-    return this.request('/api/user/register', {
+    return this.request('/api/auth/register', {
       method: 'POST',
       body: JSON.stringify(userData),
     });
