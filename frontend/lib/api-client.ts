@@ -3,11 +3,46 @@ export class ApiClient {
   private baseURL: string;
 
   constructor() {
-    // Connect to the Express backend server (which connects to MT5 bridge internally)
+    // Connect to proper backend based on environment
     this.baseURL = import.meta.env.VITE_API_URL ||
       (import.meta.env.PROD
         ? 'https://backend-c10yefh44-paolos-projects-dc6990da.vercel.app'
         : 'http://localhost:3001');
+  }
+
+  // User authentication storage - separate from MT5 connection
+  private saveUserCredentials(email: string, password: string, userData: any) {
+    const creds = {
+      email,
+      password_hash: btoa(password), // Simple base64 encoding for demo
+      user: userData,
+      registeredAt: Date.now()
+    };
+    localStorage.setItem('user_credentials', JSON.stringify(creds));
+  }
+
+  private validateUserCredentials(email: string, password: string): {isValid: boolean, user?: any} {
+    try {
+      const stored = localStorage.getItem('user_credentials');
+      if (!stored) return {isValid: false};
+
+      const creds = JSON.parse(stored);
+      const isValid = creds.email === email && creds.password_hash === btoa(password);
+
+      return {isValid, user: isValid ? creds.user : undefined};
+    } catch (error) {
+      console.error('Credential validation error:', error);
+      return {isValid: false};
+    }
+  }
+
+  private getStoredUser(): any | null {
+    try {
+      const stored = localStorage.getItem('user_credentials');
+      return stored ? JSON.parse(stored).user : null;
+    } catch (error) {
+      return null;
+    }
   }
 
   private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
@@ -93,7 +128,7 @@ export class ApiClient {
     }
   }
 
-  // PRODUCTION: No mock data - all responses must be real
+  // PRODUCTION: Direct MT5 bridge connection - no Encore proxy
 
   // Health check
   async health() {
@@ -189,15 +224,17 @@ export class ApiClient {
     });
   }
 
-  async login(credentials: any) {
+  async login(credentials: {email: string, password: string}) {
+    // Use real backend authentication
     return this.request('/api/auth/login', {
       method: 'POST',
       body: JSON.stringify(credentials),
     });
   }
 
-  async register(userData: any) {
-    return this.request('/api/auth/register', {
+  async register(userData: {name: string, email: string, password: string}) {
+    // Use real backend registration
+    return this.request('/api/user/register', {
       method: 'POST',
       body: JSON.stringify(userData),
     });

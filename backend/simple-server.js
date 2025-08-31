@@ -40,12 +40,15 @@ const corsOptions = {
     ? [
         'https://ai-cash-revolution-frontend.vercel.app',
         'https://ai-trading-bot.vercel.app',
-        'https://frontend-*-paolos-projects-dc6990da.vercel.app', // Vercel preview domains
-        'https://ai-money-generator-frontend.vercel.app'
+        'https://ai-money-generator-frontend.vercel.app',
+        /^https:\/\/.*-paolos-projects-dc6990da\.vercel\.app$/, // All Vercel projects pattern
+        /^https:\/\/.*-.*\.vercel\.app$/, // All Vercel preview domains
+        /^https:\/\/.*\.vercel\.app$/ // All Vercel domains
       ]
     : [
         'http://localhost:5173', // Vite dev server
         'http://localhost:3000', // Alternative React dev server
+        'http://localhost:4173', // Vite preview
         'http://localhost:8080'  // MT5 bridge server for testing
       ],
   credentials: true,
