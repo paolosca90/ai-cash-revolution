@@ -43,7 +43,7 @@ function App() {
         return false;
       }
 
-      const response = await fetch('https://backend-c10yefh44-paolos-projects-dc6990da.vercel.app/api/auth/verify', {
+      const response = await fetch('http://localhost:8080/api/mt5/status', {
         headers: {
           'Authorization': `Bearer ${token}`
         }

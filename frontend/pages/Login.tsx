@@ -45,39 +45,36 @@ export default function Login({ onLogin }: LoginProps) {
     setError("");
 
     try {
-      // FORCE production URL - override any environment settings
-      const baseURL = 'https://backend-c10yefh44-paolos-projects-dc6990da.vercel.app';
-      
-      const response = await fetch(`${baseURL}/api/auth/login`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          email: formData.email,
-          password: formData.password
-        })
+      // First, authenticate user using our local authentication system
+      const apiClient = (await import('@/lib/api-client')).apiClient;
+      const authData = await apiClient.login({
+        email: formData.email,
+        password: formData.password
       });
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Login failed');
+      if (!authData.success) {
+        throw new Error('Invalid email or password');
       }
 
-      // Store authentication data in Supabase format
-      if (data.success && data.token) {
-        localStorage.setItem("supabase.auth.token", data.token);
-        localStorage.setItem("auth_token", data.token);
-        localStorage.setItem("user_data", JSON.stringify(data.user));
-        if (data.refreshToken) {
-          localStorage.setItem("supabase.auth.refresh_token", data.refreshToken);
-        }
+      // Store authentication data
+      if (authData.token) {
+        localStorage.setItem("supabase.auth.token", authData.token);
+        localStorage.setItem("auth_token", authData.token);
+        localStorage.setItem("user_data", JSON.stringify(authData.user));
       }
-      
+
+      // Try to get MT5 configuration (optional - doesn't fail login)
+      try {
+        await apiClient.getMt5Config();
+        console.log('MT5 configuration available');
+      } catch (mt5Error) {
+        console.warn('MT5 configuration unavailable:', mt5Error);
+        // Don't fail login if MT5 is not available
+      }
+
       toast({
         title: "🎉 Login Successful!",
-        description: `Welcome back, ${data.user.name}!`
+        description: `Welcome back, ${authData.user.name}!`
       });
 
       setLoading(false);

@@ -86,37 +86,28 @@ export default function Register() {
     setError("");
 
     try {
-      // Use the production Express backend URL instead of localhost:3002
-      const baseURL = import.meta.env.VITE_API_URL || 
-        (import.meta.env.PROD 
-          ? 'https://backend-c10yefh44-paolos-projects-dc6990da.vercel.app'
-          : 'http://localhost:3001');
-      
-      const response = await fetch(`${baseURL}/api/user/register`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          name: formData.name,
-          email: formData.email,
-          password: formData.password
-        })
+      // Register user through our authentication system
+      const apiClient = (await import('@/lib/api-client')).apiClient;
+      const data = await apiClient.register({
+        name: formData.name,
+        email: formData.email,
+        password: formData.password
       });
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Registration failed');
+      if (!data.success) {
+        throw new Error(data.message || 'Registration failed');
       }
 
       // Store authentication data
-      localStorage.setItem("auth_token", data.token);
-      localStorage.setItem("user_data", JSON.stringify(data.user));
+      if (data.token) {
+        localStorage.setItem("auth_token", data.token);
+        localStorage.setItem("supabase.auth.token", data.token);
+        localStorage.setItem("user_data", JSON.stringify(data.user));
+      }
 
       toast({
-        title: "🎉 Registration Successful!",
-        description: `Welcome ${data.user.name}! Your 7-day free trial has started.`
+        title: "🎉 Demo Registration Successful!",
+        description: `Welcome ${data.user.name}! Demo account created for MT5 testing.`
       });
       
       setLoading(false);
