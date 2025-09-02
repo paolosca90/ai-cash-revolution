@@ -15,22 +15,51 @@ CORS(app)
 mt5_connected = False
 
 def initialize_mt5():
-    """Initialize MT5 connection"""
+    """Initialize MT5 connection with optional login credentials"""
     global mt5_connected
     
+    # Try to initialize MT5 without login first (use current terminal login)
     if not mt5.initialize():
-        logger.error("Failed to initialize MT5")
+        logger.error("Failed to initialize MT5 - Make sure MT5 terminal is running")
         return False
+    
+    # Check if we have login credentials in environment variables
+    mt5_login = os.getenv('MT5_LOGIN')
+    mt5_password = os.getenv('MT5_PASSWORD')
+    mt5_server = os.getenv('MT5_SERVER')
+    
+    # If credentials are provided, try to login
+    if mt5_login and mt5_password and mt5_server:
+        try:
+            login_result = mt5.login(
+                login=int(mt5_login),
+                password=mt5_password,
+                server=mt5_server
+            )
+            
+            if not login_result:
+                logger.warning(f"Failed to login with provided credentials: {mt5.last_error()}")
+                logger.info("Continuing with current terminal login...")
+            else:
+                logger.info(f"Successfully logged in with account {mt5_login} on server {mt5_server}")
+                
+        except Exception as e:
+            logger.warning(f"Login attempt failed: {e}")
+            logger.info("Continuing with current terminal login...")
     
     # Get account info to verify connection
     account_info = mt5.account_info()
     if account_info is None:
-        logger.error("Failed to get account info")
+        error_code = mt5.last_error()
+        logger.error(f"Failed to get account info: {error_code}")
         mt5.shutdown()
         return False
     
     logger.info(f"MT5 initialized successfully")
     logger.info(f"Account: {account_info.login}, Balance: {account_info.balance}, Server: {account_info.server}")
+    logger.info(f"Currency: {account_info.currency}, Leverage: 1:{account_info.leverage}")
+    logger.info(f"Trading allowed: {account_info.trade_allowed}")
+    
     mt5_connected = True
     return True
 
@@ -411,12 +440,137 @@ def close_position():
             'error': str(e)
         }), 500
 
+@app.route('/login', methods=['POST'])
+def mt5_login():
+    """Login to MT5 with new credentials"""
+    try:
+        if not mt5_connected:
+            return jsonify({
+                'success': False,
+                'error': 'MT5 not initialized'
+            }), 400
+        
+        data = request.get_json()
+        login = data.get('login')
+        password = data.get('password')
+        server = data.get('server')
+        
+        if not all([login, password, server]):
+            return jsonify({
+                'success': False,
+                'error': 'Login, password, and server are required'
+            }), 400
+        
+        # Attempt login
+        login_result = mt5.login(
+            login=int(login),
+            password=password,
+            server=server
+        )
+        
+        if not login_result:
+            error_code = mt5.last_error()
+            return jsonify({
+                'success': False,
+                'error': f'Login failed: {error_code}'
+            }), 400
+        
+        # Get account info after successful login
+        account_info = mt5.account_info()
+        if account_info is None:
+            return jsonify({
+                'success': False,
+                'error': 'Failed to get account info after login'
+            }), 400
+        
+        logger.info(f"Successfully logged in to account {login} on server {server}")
+        
+        return jsonify({
+            'success': True,
+            'account': {
+                'login': account_info.login,
+                'server': account_info.server,
+                'balance': account_info.balance,
+                'equity': account_info.equity,
+                'currency': account_info.currency,
+                'leverage': account_info.leverage,
+                'trade_allowed': account_info.trade_allowed
+            }
+        })
+        
+    except Exception as e:
+        logger.error(f"Login error: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@app.route('/symbols', methods=['GET'])
+def get_symbols():
+    """Get available trading symbols"""
+    try:
+        if not mt5_connected:
+            return jsonify({'error': 'Not connected to MT5'}), 400
+        
+        # Get all symbols
+        symbols = mt5.symbols_get()
+        
+        if symbols is None:
+            return jsonify({'error': 'Failed to get symbols'}), 500
+        
+        # Filter to show only visible symbols
+        visible_symbols = []
+        for symbol in symbols:
+            if symbol.visible:
+                visible_symbols.append({
+                    'name': symbol.name,
+                    'description': symbol.description if hasattr(symbol, 'description') else symbol.name,
+                    'bid': symbol.bid,
+                    'ask': symbol.ask,
+                    'spread': symbol.spread,
+                    'digits': symbol.digits,
+                    'tradable': symbol.visible and symbol.select
+                })
+        
+        return jsonify({
+            'symbols': visible_symbols[:100]  # Limit to first 100 for performance
+        })
+        
+    except Exception as e:
+        logger.error(f"Get symbols error: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/health', methods=['GET'])
+def health_check():
+    """Health check endpoint"""
+    return jsonify({
+        'status': 'healthy',
+        'mt5_connected': mt5_connected,
+        'service': 'MT5 Python Server'
+    })
+
 if __name__ == '__main__':
     logger.info("Starting MT5 Python Server...")
     
     # Initialize MT5 connection
     if initialize_mt5():
         logger.info("MT5 server ready on port 8080")
+        logger.info("Available endpoints:")
+        logger.info("- GET  /status     - Get connection status")
+        logger.info("- GET  /health     - Health check")
+        logger.info("- GET  /symbols    - Get available symbols")
+        logger.info("- POST /login      - Login with credentials")
+        logger.info("- POST /rates      - Get historical rates")
+        logger.info("- POST /symbol_info - Get symbol information")
+        logger.info("- POST /execute    - Execute order")
+        logger.info("- GET  /positions  - Get positions")
+        logger.info("- POST /close_position - Close position")
+        
         app.run(host='0.0.0.0', port=8080, debug=False)
     else:
         logger.error("Failed to start MT5 server - MT5 initialization failed")
+        logger.info("Make sure:")
+        logger.info("1. MT5 terminal is running")
+        logger.info("2. You are logged into an account")
+        logger.info("3. AutoTrading is enabled")
+        logger.info("4. Python has necessary permissions")

@@ -86,32 +86,30 @@ export default function Register() {
     setError("");
 
     try {
-      // Register user through our authentication system
-      const apiClient = (await import('@/lib/api-client')).apiClient;
-      const data = await apiClient.register({
-        name: formData.name,
-        email: formData.email,
-        password: formData.password
+      // Register user through Supabase
+      const { signUp } = await import('@/lib/supabase');
+      const data = await signUp(formData.email, formData.password, {
+        name: formData.name
       });
 
-      if (!data.success) {
-        throw new Error(data.message || 'Registration failed');
+      if (!data.user) {
+        throw new Error('Registration failed');
       }
 
-      // Store authentication data
-      if (data.token) {
-        localStorage.setItem("auth_token", data.token);
-        localStorage.setItem("supabase.auth.token", data.token);
-        localStorage.setItem("user_data", JSON.stringify(data.user));
-      }
+      // Store user data in localStorage for compatibility
+      localStorage.setItem("user_data", JSON.stringify({
+        id: data.user.id,
+        email: data.user.email,
+        name: formData.name
+      }));
 
       toast({
-        title: "🎉 Demo Registration Successful!",
-        description: `Welcome ${data.user.name}! Demo account created for MT5 testing.`
+        title: "🎉 Registration Successful!",
+        description: `Welcome ${formData.name}! Check your email to verify your account.`
       });
       
       setLoading(false);
-      navigate('/mt5-setup');
+      navigate('/login');
 
     } catch (error) {
       console.error('Registration error:', error);

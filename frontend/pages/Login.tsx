@@ -45,26 +45,24 @@ export default function Login({ onLogin }: LoginProps) {
     setError("");
 
     try {
-      // First, authenticate user using our local authentication system
-      const apiClient = (await import('@/lib/api-client')).apiClient;
-      const authData = await apiClient.login({
-        email: formData.email,
-        password: formData.password
-      });
+      // Use Supabase authentication
+      const { signIn } = await import('@/lib/supabase');
+      const authData = await signIn(formData.email, formData.password);
 
-      if (!authData.success) {
+      if (!authData.user) {
         throw new Error('Invalid email or password');
       }
 
-      // Store authentication data
-      if (authData.token) {
-        localStorage.setItem("supabase.auth.token", authData.token);
-        localStorage.setItem("auth_token", authData.token);
-        localStorage.setItem("user_data", JSON.stringify(authData.user));
-      }
+      // Store user data in localStorage for compatibility
+      localStorage.setItem("user_data", JSON.stringify({
+        id: authData.user.id,
+        email: authData.user.email,
+        name: authData.user.user_metadata?.name || authData.user.email
+      }));
 
       // Try to get MT5 configuration (optional - doesn't fail login)
       try {
+        const apiClient = (await import('@/lib/api-client')).apiClient;
         await apiClient.getMt5Config();
         console.log('MT5 configuration available');
       } catch (mt5Error) {
@@ -74,7 +72,7 @@ export default function Login({ onLogin }: LoginProps) {
 
       toast({
         title: "🎉 Login Successful!",
-        description: `Welcome back, ${authData.user.name}!`
+        description: `Welcome back, ${authData.user.user_metadata?.name || authData.user.email}!`
       });
 
       setLoading(false);

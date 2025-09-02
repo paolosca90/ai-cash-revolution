@@ -3,11 +3,17 @@ export class ApiClient {
   private baseURL: string;
 
   constructor() {
-    // Connect to proper backend based on environment
-    this.baseURL = import.meta.env.VITE_API_URL ||
-      (import.meta.env.PROD
-        ? 'https://backend-c10yefh44-paolos-projects-dc6990da.vercel.app'
-        : 'http://localhost:3001');
+    // Use different endpoints based on environment
+    if (import.meta.env.PROD) {
+      // Production: Use the production API URL
+      this.baseURL = import.meta.env.VITE_PRODUCTION_API_URL || 
+        'https://backend-c10yefh44-paolos-projects-dc6990da.vercel.app';
+    } else {
+      // Development: Use local Encore backend
+      this.baseURL = import.meta.env.VITE_ENCORE_API_URL || 'http://localhost:4000';
+    }
+    
+    console.log(`API Client initialized with baseURL: ${this.baseURL}`);
   }
 
   // User authentication storage - separate from MT5 connection
