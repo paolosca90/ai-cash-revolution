@@ -17,12 +17,29 @@ build/
 .nuxt/
 .vitepress/dist
 
-# Environment files
+# Environment files - NEVER COMMIT THESE!
 .env
 .env.local
 .env.*.local
 .env.development
 .env.production
+.env.staging
+.env.test
+*/.env
+*/.env.*
+backend/.env
+frontend/.env.*
+
+# API Keys and Secrets - SECURITY CRITICAL
+**/SENDGRID_*
+**/SUPABASE_*
+**/API_KEY*
+**/*_API_KEY*
+**/*_SECRET*
+**/JWT_*
+**/*api*key*
+**/*secret*
+config/secrets.*
 
 # IDE/Editor
 .vscode/
