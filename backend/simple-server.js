@@ -19,6 +19,10 @@ sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 let debugEmails = [];
 const MAX_DEBUG_EMAILS = 100; // Limit to prevent memory issues
 
+// Registration debug system - Array to track registration attempts
+let debugRegistrations = [];
+const MAX_DEBUG_REGISTRATIONS = 50;
+
 // Function to add debug email
 function addDebugEmail(emailData) {
   const debugEntry = {
@@ -32,6 +36,24 @@ function addDebugEmail(emailData) {
   // Keep only last MAX_DEBUG_EMAILS
   if (debugEmails.length > MAX_DEBUG_EMAILS) {
     debugEmails = debugEmails.slice(0, MAX_DEBUG_EMAILS);
+  }
+  
+  return debugEntry.id;
+}
+
+// Function to add debug registration
+function addDebugRegistration(registrationData) {
+  const debugEntry = {
+    id: Date.now() + '-' + Math.random().toString(36).substr(2, 9),
+    timestamp: new Date().toISOString(),
+    ...registrationData
+  };
+  
+  debugRegistrations.unshift(debugEntry); // Add to beginning
+  
+  // Keep only last MAX_DEBUG_REGISTRATIONS
+  if (debugRegistrations.length > MAX_DEBUG_REGISTRATIONS) {
+    debugRegistrations = debugRegistrations.slice(0, MAX_DEBUG_REGISTRATIONS);
   }
   
   return debugEntry.id;
@@ -254,6 +276,16 @@ app.post('/api/auth/register', async (req, res) => {
 
     const { email, password, name = 'Trading User' } = req.body;
     console.log('✅ [REGISTRATION] Validation passed for:', email);
+    
+    // Track this registration attempt
+    const registrationId = addDebugRegistration({
+      email,
+      name,
+      userAgent: req.headers['user-agent'],
+      ip: req.ip || req.connection.remoteAddress,
+      timestamp: new Date().toISOString(),
+      status: 'started'
+    });
 
     if (useSupabase && supabase) {
       console.log('🔄 [REGISTRATION] Using Supabase mode');
@@ -300,6 +332,15 @@ app.post('/api/auth/register', async (req, res) => {
       console.log('👤 [REGISTRATION] User name:', name);
       const emailResult = await sendWelcomeEmail(email, name);
       console.log('📊 [REGISTRATION] Email result:', emailResult);
+      
+      // Update registration debug with email result
+      const regIndex = debugRegistrations.findIndex(r => r.id === registrationId);
+      if (regIndex !== -1) {
+        debugRegistrations[regIndex].emailResult = emailResult;
+        debugRegistrations[regIndex].emailSent = emailResult.success;
+        debugRegistrations[regIndex].status = 'completed';
+      }
+      
       if (!emailResult.success) {
         console.error('⚠️ [REGISTRATION] Welcome email failed but continuing registration:', emailResult.error);
       } else {
@@ -332,6 +373,15 @@ app.post('/api/auth/register', async (req, res) => {
       console.log('👤 [REGISTRATION] [DEMO] User name:', name);
       const emailResult = await sendWelcomeEmail(email, name);
       console.log('📊 [REGISTRATION] [DEMO] Email result:', emailResult);
+      
+      // Update registration debug with email result
+      const regIndex = debugRegistrations.findIndex(r => r.id === registrationId);
+      if (regIndex !== -1) {
+        debugRegistrations[regIndex].emailResult = emailResult;
+        debugRegistrations[regIndex].emailSent = emailResult.success;
+        debugRegistrations[regIndex].status = 'completed_demo';
+      }
+      
       if (!emailResult.success) {
         console.error('⚠️ [REGISTRATION] [DEMO] Welcome email failed but continuing demo registration:', emailResult.error);
       } else {
@@ -347,7 +397,7 @@ app.post('/api/auth/register', async (req, res) => {
     }
 
   } catch (error) {
-    console.error('Registration error:', error);
+    console.error('❌ [REGISTRATION] Registration error:', error);
     res.status(500).json({
       success: false,
       error: 'Internal server error during registration'
@@ -3075,6 +3125,39 @@ app.get('/api/debug/emails', (req, res) => {
       success: false,
       error: 'Failed to retrieve debug emails',
       details: error.message
+    });
+  }
+});
+
+// Get debug registrations
+app.get('/api/debug/registrations', (req, res) => {
+  try {
+    const { limit = 10 } = req.query;
+    
+    // Limit results
+    const recentRegistrations = debugRegistrations.slice(0, parseInt(limit));
+    
+    // Calculate stats
+    const stats = {
+      total_registrations: debugRegistrations.length,
+      successful_registrations: debugRegistrations.filter(r => r.status === 'completed' || r.status === 'completed_demo').length,
+      with_email_sent: debugRegistrations.filter(r => r.emailSent).length,
+      last_registration_time: debugRegistrations[0]?.timestamp || null,
+      supabase_mode_count: debugRegistrations.filter(r => r.status === 'completed').length,
+      demo_mode_count: debugRegistrations.filter(r => r.status === 'completed_demo').length
+    };
+
+    res.json({
+      success: true,
+      registrations: recentRegistrations,
+      stats,
+      notice: "These are registration attempts tracked for debugging purposes."
+    });
+  } catch (error) {
+    console.error('Error fetching debug registrations:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Internal server error fetching debug registrations'
     });
   }
 });
