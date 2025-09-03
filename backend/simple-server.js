@@ -4,6 +4,7 @@ import dotenv from 'dotenv';
 import { createClient } from '@supabase/supabase-js';
 import Joi from 'joi';
 import fetch from 'node-fetch';
+import sgMail from '@sendgrid/mail';
 
 // Load environment variables
 dotenv.config();
@@ -11,17 +12,31 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 3001;
 
+// Initialize SendGrid
+sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+
 // Initialize Supabase client
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseAnonKey = process.env.SUPABASE_ANON_KEY;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 let supabase = null;
+let supabaseAdmin = null;
 let useSupabase = false;
 
 if (supabaseUrl && supabaseAnonKey && 
     !supabaseUrl.includes('your-project-ref') && 
     !supabaseAnonKey.includes('your-anon-public-key')) {
   supabase = createClient(supabaseUrl, supabaseAnonKey);
+  
+  // Create admin client for backend operations (user creation, etc.)
+  if (supabaseServiceKey) {
+    supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
+      auth: { autoRefreshToken: false, persistSession: false }
+    });
+    console.log('✅ Supabase admin client initialized');
+  }
+  
   useSupabase = true;
   console.log('✅ Supabase initialized successfully');
 } else {
@@ -48,8 +63,10 @@ const corsOptions = {
         'https://ai-cash-revolution-frontend.vercel.app',
         'https://ai-trading-bot.vercel.app',
         'https://ai-money-generator-frontend.vercel.app',
+        'https://frontend-l5jgqe3jg-paolos-projects-dc6990da.vercel.app', // Current frontend deployment
         /^https:\/\/.*-paolos-projects-dc6990da\.vercel\.app$/, // All Vercel projects pattern
-        /^https:\/\/.*-.*\.vercel\.app$/, // All Vercel preview domains
+        /^https:\/\/frontend-.*\.vercel\.app$/, // Frontend-specific pattern
+        /^https:\/\/.*-.*-.*\.vercel\.app$/, // Three-part Vercel domains
         /^https:\/\/.*\.vercel\.app$/ // All Vercel domains
       ]
     : [
@@ -230,9 +247,9 @@ app.post('/api/auth/register', async (req, res) => {
         });
       }
 
-      // Create user profile in database
-      if (data.user) {
-        const { error: profileError } = await supabase
+      // Create user profile in database using admin client
+      if (data.user && supabaseAdmin) {
+        const { error: profileError } = await supabaseAdmin
           .from('profiles')
           .insert({
             id: data.user.id,
@@ -245,12 +262,17 @@ app.post('/api/auth/register', async (req, res) => {
         if (profileError) {
           console.error('Profile creation error:', profileError);
           // Continue anyway as user is created in auth
+        } else {
+          console.log('✅ User profile created successfully');
         }
       }
 
+      // Send welcome email
+      await sendWelcomeEmail(email, name);
+
       res.json({
         success: true,
-        message: 'User registered successfully. Please check your email for verification.',
+        message: 'User registered successfully. Check your email for next steps!',
         user: {
           id: data.user?.id,
           email: email,
@@ -268,9 +290,12 @@ app.post('/api/auth/register', async (req, res) => {
         subscription: 'basic'
       };
 
+      // Send welcome email in demo mode too
+      await sendWelcomeEmail(email, name);
+
       res.json({
         success: true,
-        message: 'User registered successfully in demo mode.',
+        message: 'User registered successfully in demo mode. Check your email!',
         user: demoUser,
         needsVerification: false // No verification needed in demo mode
       });
@@ -1879,7 +1904,7 @@ app.post('/api/user/validate-mt5-credentials', authenticateToken, async (req, re
       }
       
       // Save validated credentials to user profile
-      const { data: profile, error: updateError } = await supabase
+      const { data: profile, error: updateError } = await supabaseAdmin
         .from('profiles')
         .update({
           mt5_login: login,
@@ -1912,14 +1937,19 @@ app.post('/api/user/validate-mt5-credentials', authenticateToken, async (req, re
         },
         accountInfo: testResult.account_info
       });
+
+      // Send installer email
+      const installerUrl = `https://backend-jcbkqeyys-paolos-projects-dc6990da.vercel.app/api/download/installer/${req.user.id}`;
+      await sendInstallerEmail(req.user.email, req.user.email.split('@')[0], installerUrl, installerData.instructions);
       
       res.json({
         success: true,
-        message: 'MT5 credentials validated successfully',
+        message: 'MT5 credentials validated successfully. Installer sent to your email!',
         account_info: testResult.account_info,
         installer_ready: true,
         installer_url: `/api/download/installer/${req.user.id}`,
-        setup_instructions: installerData.instructions
+        setup_instructions: installerData.instructions,
+        email_sent: true
       });
       
     } catch (fetchError) {
@@ -1936,7 +1966,7 @@ app.post('/api/user/validate-mt5-credentials', authenticateToken, async (req, re
       };
       
       // Save demo credentials
-      const { error: updateError } = await supabase
+      const { error: updateError } = await supabaseAdmin
         .from('profiles')
         .update({
           mt5_login: login,
@@ -1956,13 +1986,24 @@ app.post('/api/user/validate-mt5-credentials', authenticateToken, async (req, re
         });
       }
       
+      // Send installer email even in demo mode
+      const installerUrl = `https://backend-jcbkqeyys-paolos-projects-dc6990da.vercel.app/api/download/installer/${req.user.id}`;
+      const userName = req.user.email.split('@')[0];
+      await sendInstallerEmail(req.user.email, userName, installerUrl, {
+        title: "Demo Installation Setup",
+        steps: [
+          {step: 1, title: "Demo Mode", description: "This is a demo installation for testing purposes"}
+        ]
+      });
+
       res.json({
         success: true,
-        message: 'MT5 credentials validated (demo mode)',
+        message: 'MT5 credentials validated (demo mode). Installer sent to your email!',
         account_info: demoAccountInfo,
         installer_ready: true,
         installer_url: `/api/download/installer/${req.user.id}`,
-        demo_mode: true
+        demo_mode: true,
+        email_sent: true
       });
     }
     
@@ -2274,11 +2315,11 @@ def initialize_mt5():
         mt5_connected = True
         
         safe_log("=== MT5 CONNESSO SUCCESSFULLY ===")
-        safe_log(f"Account: {account_info.login}")
-        safe_log(f"Server: {account_info.server}")
-        safe_log(f"Balance: ${account_info.balance:.2f} {account_info.currency}")
-        safe_log(f"Leverage: 1:{account_info.leverage}")
-        safe_log(f"Company: {account_info.company}")
+        safe_log(f"Account: \\{account_info.login\\}")
+        safe_log(f"Server: \\{account_info.server\\}")
+        safe_log(f"Balance: $\\{account_info.balance:.2f\\} \\{account_info.currency\\}")
+        safe_log(f"Leverage: 1:\\{account_info.leverage\\}")
+        safe_log(f"Company: \\{account_info.company\\}")
         
         return True
         
@@ -2586,6 +2627,157 @@ python mt5-server-personalized.py
 ---
 *🎯 Sistema generato automaticamente per ${config.USER_EMAIL}*
 `;
+}
+
+// Email service functions
+async function sendInstallerEmail(userEmail, userName, installerUrl, setupInstructions) {
+  try {
+    const msg = {
+      to: userEmail,
+      from: {
+        email: process.env.SENDGRID_FROM_EMAIL,
+        name: process.env.SENDGRID_FROM_NAME
+      },
+      subject: '🎯 Il tuo Installer Personalizzato AI Cash Revolution è pronto!',
+      html: generateInstallerEmailHTML(userName, installerUrl, setupInstructions),
+      text: `Ciao ${userName},\n\nIl tuo installer personalizzato per AI Cash Revolution è pronto!\n\nScarica qui: ${installerUrl}\n\nSegui le istruzioni per completare il setup.\n\nSupporto: ${process.env.SUPPORT_EMAIL}`
+    };
+
+    await sgMail.send(msg);
+    console.log(`Installer email sent successfully to ${userEmail}`);
+    return { success: true };
+  } catch (error) {
+    console.error('Error sending installer email:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+function generateInstallerEmailHTML(userName, installerUrl, setupInstructions) {
+  return `
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="UTF-8">
+        <title>AI Cash Revolution - Installer Ready</title>
+    </head>
+    <body style="font-family: Arial, sans-serif; background-color: #f5f5f5; margin: 0; padding: 20px;">
+        <div style="max-width: 600px; margin: 0 auto; background-color: white; border-radius: 10px; overflow: hidden; box-shadow: 0 4px 10px rgba(0,0,0,0.1);">
+            <!-- Header -->
+            <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; text-align: center;">
+                <h1 style="color: white; margin: 0; font-size: 24px;">🎯 AI Cash Revolution</h1>
+                <p style="color: rgba(255,255,255,0.9); margin: 10px 0 0 0;">Il tuo Trading Bot Personalizzato è Pronto!</p>
+            </div>
+            
+            <!-- Content -->
+            <div style="padding: 30px;">
+                <h2 style="color: #333; margin-bottom: 20px;">Ciao ${userName}! 👋</h2>
+                
+                <p style="color: #666; line-height: 1.6; margin-bottom: 20px;">
+                    Fantastico! Hai completato la registrazione e il tuo installer personalizzato per il VPS è pronto per il download.
+                </p>
+                
+                <div style="background-color: #f8f9fa; border-left: 4px solid #28a745; padding: 20px; margin: 20px 0; border-radius: 5px;">
+                    <h3 style="color: #28a745; margin-top: 0;">✅ Cosa Include il Tuo Package:</h3>
+                    <ul style="color: #666; line-height: 1.8;">
+                        <li>🔧 Server MT5 preconfigurato con i tuoi dati</li>
+                        <li>📋 File di configurazione personalizzati</li>
+                        <li>🚀 Script di installazione automatica</li>
+                        <li>📖 Guida setup completa step-by-step</li>
+                        <li>🛡️ Configurazioni di sicurezza avanzate</li>
+                    </ul>
+                </div>
+                
+                <!-- Download Button -->
+                <div style="text-align: center; margin: 30px 0;">
+                    <a href="${installerUrl}" 
+                       style="display: inline-block; background: linear-gradient(135deg, #28a745 0%, #20c997 100%); 
+                              color: white; text-decoration: none; padding: 15px 30px; 
+                              border-radius: 25px; font-weight: bold; font-size: 16px;
+                              box-shadow: 0 4px 15px rgba(40, 167, 69, 0.3);">
+                        📥 Scarica il Tuo Installer Personalizzato
+                    </a>
+                </div>
+                
+                <!-- Setup Instructions Preview -->
+                <div style="background-color: #fff3cd; border: 1px solid #ffeaa7; padding: 20px; border-radius: 8px; margin: 20px 0;">
+                    <h3 style="color: #856404; margin-top: 0;">🔧 Quick Setup (5-10 minuti):</h3>
+                    <ol style="color: #856404; line-height: 1.8; margin: 0; padding-left: 20px;">
+                        <li>Scarica ed estrai il file ZIP</li>
+                        <li>Esegui <code>INSTALL.bat</code> come Amministratore</li>
+                        <li>Segui la guida completa inclusa</li>
+                        <li>Avvia il tuo server personalizzato</li>
+                        <li>🎉 Inizia a fare trading!</li>
+                    </ol>
+                </div>
+                
+                <!-- Support Section -->
+                <div style="border-top: 1px solid #eee; padding-top: 20px; margin-top: 30px;">
+                    <h3 style="color: #333;">📞 Serve Aiuto?</h3>
+                    <p style="color: #666; line-height: 1.6;">
+                        Il nostro team di supporto è qui per te 24/7:
+                    </p>
+                    <ul style="color: #666; line-height: 1.8; list-style: none; padding-left: 0;">
+                        <li>📧 Email: <a href="mailto:${process.env.SUPPORT_EMAIL}" style="color: #007bff;">${process.env.SUPPORT_EMAIL}</a></li>
+                        <li>💬 Telegram: @AITradingSupport</li>
+                        <li>📚 Docs: <a href="https://docs.aicashrevolution.com" style="color: #007bff;">docs.aicashrevolution.com</a></li>
+                    </ul>
+                </div>
+                
+                <!-- Footer -->
+                <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee; text-align: center;">
+                    <p style="color: #999; font-size: 14px; margin: 0;">
+                        Generato automaticamente per ${userName} • AI Cash Revolution 2025
+                    </p>
+                </div>
+            </div>
+        </div>
+        
+        <div style="text-align: center; margin-top: 20px;">
+            <p style="color: #999; font-size: 12px;">
+                Non condividere mai questo installer con altri utenti.<br>
+                Contiene configurazioni personalizzate per il tuo account.
+            </p>
+        </div>
+    </body>
+    </html>
+  `;
+}
+
+async function sendWelcomeEmail(userEmail, userName) {
+  try {
+    const msg = {
+      to: userEmail,
+      from: {
+        email: process.env.SENDGRID_FROM_EMAIL,
+        name: process.env.SENDGRID_FROM_NAME
+      },
+      subject: '🎉 Benvenuto in AI Cash Revolution!',
+      html: `
+        <h2>🎉 Benvenuto ${userName}!</h2>
+        <p>La tua registrazione a <strong>AI Cash Revolution</strong> è stata completata con successo!</p>
+        
+        <h3>🚀 Prossimi Passi:</h3>
+        <ol>
+          <li>Accedi alla dashboard del trading</li>
+          <li>Configura il tuo account MT5</li>
+          <li>Ricevi il tuo installer personalizzato via email</li>
+          <li>Inizia a fare trading automatico!</li>
+        </ol>
+        
+        <p>Supporto 24/7: <a href="mailto:${process.env.SUPPORT_EMAIL}">${process.env.SUPPORT_EMAIL}</a></p>
+        
+        <p>Buon trading!<br><strong>Team AI Cash Revolution</strong></p>
+      `,
+      text: `Benvenuto ${userName}! La tua registrazione è stata completata. Supporto: ${process.env.SUPPORT_EMAIL}`
+    };
+
+    await sgMail.send(msg);
+    console.log(`Welcome email sent successfully to ${userEmail}`);
+    return { success: true };
+  } catch (error) {
+    console.error('Error sending welcome email:', error);
+    return { success: false, error: error.message };
+  }
 }
 
 // Global error handler
