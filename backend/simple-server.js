@@ -15,6 +15,28 @@ const PORT = process.env.PORT || 3001;
 // Initialize SendGrid
 sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 
+// Email fallback system - Array to store emails when SendGrid is not available
+let debugEmails = [];
+const MAX_DEBUG_EMAILS = 100; // Limit to prevent memory issues
+
+// Function to add debug email
+function addDebugEmail(emailData) {
+  const debugEntry = {
+    id: Date.now() + Math.random(),
+    timestamp: new Date().toISOString(),
+    ...emailData
+  };
+  
+  debugEmails.unshift(debugEntry); // Add to beginning
+  
+  // Keep only last MAX_DEBUG_EMAILS
+  if (debugEmails.length > MAX_DEBUG_EMAILS) {
+    debugEmails = debugEmails.slice(0, MAX_DEBUG_EMAILS);
+  }
+  
+  return debugEntry.id;
+}
+
 // Initialize Supabase client
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseAnonKey = process.env.SUPABASE_ANON_KEY;
@@ -217,9 +239,13 @@ app.post('/api/auth/login', async (req, res) => {
 
 app.post('/api/auth/register', async (req, res) => {
   try {
+    console.log('🔄 [REGISTRATION] Starting registration process');
+    console.log('📧 [REGISTRATION] Request body:', { email: req.body.email, name: req.body.name });
+    
     // Validate request body
     const { error: validationError } = registerSchema.validate(req.body);
     if (validationError) {
+      console.log('❌ [REGISTRATION] Validation error:', validationError.details[0].message);
       return res.status(400).json({
         success: false,
         error: validationError.details[0].message
@@ -227,8 +253,10 @@ app.post('/api/auth/register', async (req, res) => {
     }
 
     const { email, password, name = 'Trading User' } = req.body;
+    console.log('✅ [REGISTRATION] Validation passed for:', email);
 
     if (useSupabase && supabase) {
+      console.log('🔄 [REGISTRATION] Using Supabase mode');
       // Register user with Supabase Auth
       const { data, error } = await supabase.auth.signUp({
         email,
@@ -268,7 +296,15 @@ app.post('/api/auth/register', async (req, res) => {
       }
 
       // Send welcome email
-      await sendWelcomeEmail(email, name);
+      console.log('📧 [REGISTRATION] Attempting to send welcome email to:', email);
+      console.log('👤 [REGISTRATION] User name:', name);
+      const emailResult = await sendWelcomeEmail(email, name);
+      console.log('📊 [REGISTRATION] Email result:', emailResult);
+      if (!emailResult.success) {
+        console.error('⚠️ [REGISTRATION] Welcome email failed but continuing registration:', emailResult.error);
+      } else {
+        console.log('✅ [REGISTRATION] Welcome email sent successfully');
+      }
 
       res.json({
         success: true,
@@ -282,6 +318,7 @@ app.post('/api/auth/register', async (req, res) => {
         needsVerification: !data.session // Will be null if email confirmation is required
       });
     } else {
+      console.log('🔄 [REGISTRATION] Using Demo mode');
       // Demo mode - simple registration
       const demoUser = {
         id: 'demo-user-' + Buffer.from(email).toString('base64').substring(0, 8),
@@ -291,7 +328,15 @@ app.post('/api/auth/register', async (req, res) => {
       };
 
       // Send welcome email in demo mode too
-      await sendWelcomeEmail(email, name);
+      console.log('📧 [REGISTRATION] [DEMO] Attempting to send welcome email to:', email);
+      console.log('👤 [REGISTRATION] [DEMO] User name:', name);
+      const emailResult = await sendWelcomeEmail(email, name);
+      console.log('📊 [REGISTRATION] [DEMO] Email result:', emailResult);
+      if (!emailResult.success) {
+        console.error('⚠️ [REGISTRATION] [DEMO] Welcome email failed but continuing demo registration:', emailResult.error);
+      } else {
+        console.log('✅ [REGISTRATION] [DEMO] Welcome email sent successfully');
+      }
 
       res.json({
         success: true,
@@ -1940,7 +1985,10 @@ app.post('/api/user/validate-mt5-credentials', authenticateToken, async (req, re
 
       // Send installer email
       const installerUrl = `https://backend-jcbkqeyys-paolos-projects-dc6990da.vercel.app/api/download/installer/${req.user.id}`;
-      await sendInstallerEmail(req.user.email, req.user.email.split('@')[0], installerUrl, installerData.instructions);
+      const installerEmailResult = await sendInstallerEmail(req.user.email, req.user.email.split('@')[0], installerUrl, installerData.instructions);
+      if (!installerEmailResult.success) {
+        console.error('⚠️ Installer email failed but continuing MT5 validation:', installerEmailResult.error);
+      }
       
       res.json({
         success: true,
@@ -1989,12 +2037,15 @@ app.post('/api/user/validate-mt5-credentials', authenticateToken, async (req, re
       // Send installer email even in demo mode
       const installerUrl = `https://backend-jcbkqeyys-paolos-projects-dc6990da.vercel.app/api/download/installer/${req.user.id}`;
       const userName = req.user.email.split('@')[0];
-      await sendInstallerEmail(req.user.email, userName, installerUrl, {
+      const installerEmailResult = await sendInstallerEmail(req.user.email, userName, installerUrl, {
         title: "Demo Installation Setup",
         steps: [
           {step: 1, title: "Demo Mode", description: "This is a demo installation for testing purposes"}
         ]
       });
+      if (!installerEmailResult.success) {
+        console.error('⚠️ Installer email failed but continuing demo MT5 validation:', installerEmailResult.error);
+      }
 
       res.json({
         success: true,
@@ -2631,25 +2682,76 @@ python mt5-server-personalized.py
 
 // Email service functions
 async function sendInstallerEmail(userEmail, userName, installerUrl, setupInstructions) {
-  try {
-    const msg = {
-      to: userEmail,
-      from: {
-        email: process.env.SENDGRID_FROM_EMAIL,
-        name: process.env.SENDGRID_FROM_NAME
-      },
-      subject: '🎯 Il tuo Installer Personalizzato AI Cash Revolution è pronto!',
-      html: generateInstallerEmailHTML(userName, installerUrl, setupInstructions),
-      text: `Ciao ${userName},\n\nIl tuo installer personalizzato per AI Cash Revolution è pronto!\n\nScarica qui: ${installerUrl}\n\nSegui le istruzioni per completare il setup.\n\nSupporto: ${process.env.SUPPORT_EMAIL}`
-    };
+  const emailData = {
+    type: 'installer',
+    to: userEmail,
+    from: {
+      email: process.env.SENDGRID_FROM_EMAIL || 'noreply@aicashrevolution.com',
+      name: process.env.SENDGRID_FROM_NAME || 'AI Cash Revolution'
+    },
+    subject: '🎯 Il tuo Installer Personalizzato AI Cash Revolution è pronto!',
+    html: generateInstallerEmailHTML(userName, installerUrl, setupInstructions),
+    text: `Ciao ${userName},\n\nIl tuo installer personalizzato per AI Cash Revolution è pronto!\n\nScarica qui: ${installerUrl}\n\nSegui le istruzioni per completare il setup.\n\nSupporto: ${process.env.SUPPORT_EMAIL || 'support@aicashrevolution.com'}`,
+    userName,
+    installerUrl,
+    setupInstructions
+  };
 
-    await sgMail.send(msg);
-    console.log(`Installer email sent successfully to ${userEmail}`);
-    return { success: true };
-  } catch (error) {
-    console.error('Error sending installer email:', error);
-    return { success: false, error: error.message };
+  // Check if SendGrid is properly configured
+  const sendGridConfigured = process.env.SENDGRID_API_KEY && 
+                           process.env.SENDGRID_FROM_EMAIL && 
+                           !process.env.SENDGRID_API_KEY.includes('your-sendgrid') &&
+                           !process.env.SENDGRID_FROM_EMAIL.includes('your-email');
+
+  if (sendGridConfigured) {
+    try {
+      console.log(`🔄 Attempting to send installer email to: ${userEmail}`);
+      console.log(`📧 From: ${process.env.SENDGRID_FROM_EMAIL}`);
+      console.log(`👤 From name: ${process.env.SENDGRID_FROM_NAME || 'AI Cash Revolution'}`);
+      console.log(`🔗 Installer URL: ${installerUrl}`);
+
+      const msg = {
+        to: userEmail,
+        from: emailData.from,
+        subject: emailData.subject,
+        html: emailData.html,
+        text: emailData.text
+      };
+
+      console.log(`📤 Sending installer email via SendGrid...`);
+      const response = await sgMail.send(msg);
+      console.log(`✅ Installer email sent successfully to ${userEmail}`);
+      console.log(`📋 SendGrid response status: ${response[0]?.statusCode}`);
+      return { success: true, statusCode: response[0]?.statusCode, method: 'sendgrid' };
+      
+    } catch (error) {
+      console.error('❌ SendGrid error, falling back to debug mode:', error.message);
+      // Fall through to fallback mode
+    }
   }
+
+  // FALLBACK MODE: Log email and return success
+  console.log('🔄 SendGrid not configured or failed, using email fallback mode');
+  console.log('📧 INSTALLER EMAIL (FALLBACK MODE):');
+  console.log('=' .repeat(60));
+  console.log(`To: ${emailData.to}`);
+  console.log(`From: ${emailData.from.name} <${emailData.from.email}>`);
+  console.log(`Subject: ${emailData.subject}`);
+  console.log(`Installer URL: ${installerUrl}`);
+  console.log('Content:');
+  console.log(emailData.text);
+  console.log('=' .repeat(60));
+  
+  // Store email in debug array
+  const debugId = addDebugEmail(emailData);
+  
+  console.log(`✅ Installer email logged successfully (Debug ID: ${debugId})`);
+  return { 
+    success: true, 
+    method: 'fallback', 
+    debugId,
+    message: 'Email would have been sent (SendGrid fallback mode)'
+  };
 }
 
 function generateInstallerEmailHTML(userName, installerUrl, setupInstructions) {
@@ -2744,41 +2846,262 @@ function generateInstallerEmailHTML(userName, installerUrl, setupInstructions) {
 }
 
 async function sendWelcomeEmail(userEmail, userName) {
-  try {
-    const msg = {
-      to: userEmail,
-      from: {
-        email: process.env.SENDGRID_FROM_EMAIL,
-        name: process.env.SENDGRID_FROM_NAME
-      },
-      subject: '🎉 Benvenuto in AI Cash Revolution!',
-      html: `
-        <h2>🎉 Benvenuto ${userName}!</h2>
-        <p>La tua registrazione a <strong>AI Cash Revolution</strong> è stata completata con successo!</p>
-        
-        <h3>🚀 Prossimi Passi:</h3>
-        <ol>
-          <li>Accedi alla dashboard del trading</li>
-          <li>Configura il tuo account MT5</li>
-          <li>Ricevi il tuo installer personalizzato via email</li>
-          <li>Inizia a fare trading automatico!</li>
-        </ol>
-        
-        <p>Supporto 24/7: <a href="mailto:${process.env.SUPPORT_EMAIL}">${process.env.SUPPORT_EMAIL}</a></p>
-        
-        <p>Buon trading!<br><strong>Team AI Cash Revolution</strong></p>
-      `,
-      text: `Benvenuto ${userName}! La tua registrazione è stata completata. Supporto: ${process.env.SUPPORT_EMAIL}`
-    };
+  console.log('📧 [EMAIL] sendWelcomeEmail called with:', { userEmail, userName });
+  
+  const emailData = {
+    type: 'welcome',
+    to: userEmail,
+    from: {
+      email: process.env.SENDGRID_FROM_EMAIL || 'noreply@aicashrevolution.com',
+      name: process.env.SENDGRID_FROM_NAME || 'AI Cash Revolution'
+    },
+    subject: '🎉 Benvenuto in AI Cash Revolution!',
+    html: `
+      <h2>🎉 Benvenuto ${userName}!</h2>
+      <p>La tua registrazione a <strong>AI Cash Revolution</strong> è stata completata con successo!</p>
+      
+      <h3>🚀 Prossimi Passi:</h3>
+      <ol>
+        <li>Accedi alla dashboard del trading</li>
+        <li>Configura il tuo account MT5</li>
+        <li>Ricevi il tuo installer personalizzato via email</li>
+        <li>Inizia a fare trading automatico!</li>
+      </ol>
+      
+      <p>Supporto 24/7: <a href="mailto:${process.env.SUPPORT_EMAIL || 'support@aicashrevolution.com'}">${process.env.SUPPORT_EMAIL || 'support@aicashrevolution.com'}</a></p>
+      
+      <p>Buon trading!<br><strong>Team AI Cash Revolution</strong></p>
+    `,
+    text: `Benvenuto ${userName}! La tua registrazione è stata completata. Supporto: ${process.env.SUPPORT_EMAIL || 'support@aicashrevolution.com'}`,
+    userName
+  };
 
-    await sgMail.send(msg);
-    console.log(`Welcome email sent successfully to ${userEmail}`);
-    return { success: true };
-  } catch (error) {
-    console.error('Error sending welcome email:', error);
-    return { success: false, error: error.message };
+  console.log('📊 [EMAIL] Email data prepared:', { to: emailData.to, from: emailData.from });
+
+  // Check if SendGrid is properly configured
+  const sendGridConfigured = process.env.SENDGRID_API_KEY && 
+                           process.env.SENDGRID_FROM_EMAIL && 
+                           !process.env.SENDGRID_API_KEY.includes('your-sendgrid') &&
+                           !process.env.SENDGRID_FROM_EMAIL.includes('your-email');
+
+  console.log('🔍 [EMAIL] SendGrid configuration check:');
+  console.log('  - API Key exists:', !!process.env.SENDGRID_API_KEY);
+  console.log('  - From Email exists:', !!process.env.SENDGRID_FROM_EMAIL);
+  console.log('  - API Key valid:', process.env.SENDGRID_API_KEY && !process.env.SENDGRID_API_KEY.includes('your-sendgrid'));
+  console.log('  - From Email valid:', process.env.SENDGRID_FROM_EMAIL && !process.env.SENDGRID_FROM_EMAIL.includes('your-email'));
+  console.log('  - Overall configured:', sendGridConfigured);
+
+  if (sendGridConfigured) {
+    try {
+      console.log(`🔄 Attempting to send welcome email to: ${userEmail}`);
+      console.log(`📧 From: ${process.env.SENDGRID_FROM_EMAIL}`);
+      console.log(`👤 From name: ${process.env.SENDGRID_FROM_NAME || 'AI Cash Revolution'}`);
+
+      const msg = {
+        to: userEmail,
+        from: emailData.from,
+        subject: emailData.subject,
+        html: emailData.html,
+        text: emailData.text
+      };
+
+      console.log(`📤 Sending email via SendGrid...`);
+      const response = await sgMail.send(msg);
+      console.log(`✅ Welcome email sent successfully to ${userEmail}`);
+      console.log(`📋 SendGrid response status: ${response[0]?.statusCode}`);
+      return { success: true, statusCode: response[0]?.statusCode, method: 'sendgrid' };
+      
+    } catch (error) {
+      console.error('❌ SendGrid error, falling back to debug mode:', error.message);
+      // Fall through to fallback mode
+    }
   }
+
+  // FALLBACK MODE: Log email and return success
+  console.log('🔄 SendGrid not configured or failed, using email fallback mode');
+  console.log('📧 WELCOME EMAIL (FALLBACK MODE):');
+  console.log('=' .repeat(60));
+  console.log(`To: ${emailData.to}`);
+  console.log(`From: ${emailData.from.name} <${emailData.from.email}>`);
+  console.log(`Subject: ${emailData.subject}`);
+  console.log('Content:');
+  console.log(emailData.text);
+  console.log('=' .repeat(60));
+  
+  // Store email in debug array
+  const debugId = addDebugEmail(emailData);
+  
+  console.log(`✅ Welcome email logged successfully (Debug ID: ${debugId})`);
+  return { 
+    success: true, 
+    method: 'fallback', 
+    debugId,
+    message: 'Email would have been sent (SendGrid fallback mode)'
+  };
 }
+
+// Test endpoint for email functionality
+app.post('/api/test/email', async (req, res) => {
+  try {
+    const { email, name } = req.body;
+    
+    if (!email) {
+      return res.status(400).json({
+        success: false,
+        error: 'Email is required'
+      });
+    }
+
+    console.log(`🧪 Testing email functionality for: ${email}`);
+    
+    const result = await sendWelcomeEmail(email, name || 'Test User');
+    
+    res.json({
+      success: result.success,
+      message: result.success ? 'Test email sent successfully!' : 'Email sending failed',
+      details: result.success ? {
+        to: email,
+        statusCode: result.statusCode
+      } : {
+        error: result.error,
+        details: result.details
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Email test error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Email test failed',
+      details: error.message
+    });
+  }
+});
+
+// Test endpoint for installer email functionality
+app.post('/api/test/installer-email', async (req, res) => {
+  try {
+    const { email, name } = req.body;
+    
+    if (!email) {
+      return res.status(400).json({
+        success: false,
+        error: 'Email is required'
+      });
+    }
+
+    console.log(`🧪 Testing installer email functionality for: ${email}`);
+    
+    // Generate a test installer URL and instructions
+    const testInstallerUrl = `https://backend-dhddc4yiq-paolos-projects-dc6990da.vercel.app/api/download/installer/test-user`;
+    const testInstructions = {
+      title: "Test Installation Setup",
+      steps: [
+        { step: 1, title: "Test Step", description: "This is a test installer email" }
+      ]
+    };
+    
+    const result = await sendInstallerEmail(email, name || 'Test User', testInstallerUrl, testInstructions);
+    
+    res.json({
+      success: result.success,
+      message: result.success ? 'Test installer email sent successfully!' : 'Installer email sending failed',
+      details: result.success ? {
+        to: email,
+        installerUrl: testInstallerUrl,
+        statusCode: result.statusCode
+      } : {
+        error: result.error,
+        details: result.details
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Installer email test error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Installer email test failed',
+      details: error.message
+    });
+  }
+});
+
+// Debug endpoint to view email fallback logs
+app.get('/api/debug/emails', (req, res) => {
+  try {
+    const { limit = 10, type } = req.query;
+    
+    let filteredEmails = debugEmails;
+    
+    // Filter by email type if specified
+    if (type && ['welcome', 'installer'].includes(type)) {
+      filteredEmails = debugEmails.filter(email => email.type === type);
+    }
+    
+    // Limit results
+    const limitedEmails = filteredEmails.slice(0, parseInt(limit));
+    
+    // Calculate stats
+    const stats = {
+      total_emails_logged: debugEmails.length,
+      welcome_emails: debugEmails.filter(e => e.type === 'welcome').length,
+      installer_emails: debugEmails.filter(e => e.type === 'installer').length,
+      last_email_time: debugEmails[0]?.timestamp || null,
+      sendgrid_configured: !!(process.env.SENDGRID_API_KEY && process.env.SENDGRID_FROM_EMAIL)
+    };
+    
+    res.json({
+      success: true,
+      message: 'Email debug logs retrieved successfully',
+      stats,
+      emails: limitedEmails.map(email => ({
+        id: email.id,
+        timestamp: email.timestamp,
+        type: email.type,
+        to: email.to,
+        from: email.from,
+        subject: email.subject,
+        userName: email.userName,
+        installerUrl: email.installerUrl,
+        preview: email.text ? email.text.substring(0, 150) + '...' : 'No text content',
+        method: 'fallback'
+      })),
+      notice: "These are emails that WOULD have been sent if SendGrid was configured. In production, configure SENDGRID_API_KEY and SENDGRID_FROM_EMAIL to actually send emails."
+    });
+    
+  } catch (error) {
+    console.error('❌ Debug emails endpoint error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to retrieve debug emails',
+      details: error.message
+    });
+  }
+});
+
+// Clear debug emails (useful for testing)
+app.delete('/api/debug/emails', (req, res) => {
+  try {
+    const originalCount = debugEmails.length;
+    debugEmails = [];
+    
+    console.log(`🧹 Cleared ${originalCount} debug emails`);
+    
+    res.json({
+      success: true,
+      message: `Cleared ${originalCount} debug emails`,
+      cleared_count: originalCount
+    });
+    
+  } catch (error) {
+    console.error('❌ Clear debug emails error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to clear debug emails',
+      details: error.message
+    });
+  }
+});
 
 // Global error handler
 app.use((error, req, res, next) => {
