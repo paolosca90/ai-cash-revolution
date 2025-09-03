@@ -56,7 +56,7 @@ const corsOptions = {
         'http://localhost:5173', // Vite dev server
         'http://localhost:3000', // Alternative React dev server
         'http://localhost:4173', // Vite preview
-        'http://localhost:8080'  // MT5 bridge server for testing
+        'http://154.61.187.189:8080'  // MT5 bridge server for testing
       ],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
@@ -689,7 +689,7 @@ app.get('/api/trading/orders', authenticateToken, async (req, res) => {
     
     // Try to get real orders from MT5 first
     try {
-      const mt5Response = await fetch('http://localhost:8080/api/mt5/positions');
+      const mt5Response = await fetch('http://154.61.187.189:8080/api/mt5/positions');
       
       if (mt5Response.ok) {
         const mt5Data = await mt5Response.json();
@@ -755,7 +755,7 @@ app.post('/api/trading/orders', authenticateToken, async (req, res) => {
     
     // Try to place order via MT5 bridge first
     try {
-      const mt5Response = await fetch('http://localhost:8080/api/mt5/order', {
+      const mt5Response = await fetch('http://154.61.187.189:8080/api/mt5/order', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -809,7 +809,7 @@ app.post('/api/trading/orders', authenticateToken, async (req, res) => {
 app.get('/api/user/mt5-config', authenticateToken, async (req, res) => {
   try {
     // Check if MT5 bridge is available
-    const statusResponse = await fetch('http://localhost:8080/health');
+    const statusResponse = await fetch('http://154.61.187.189:8080/health');
     
     if (!statusResponse.ok) {
       return res.status(503).json({
@@ -825,7 +825,7 @@ app.get('/api/user/mt5-config', authenticateToken, async (req, res) => {
       success: true,
       bridgeConnected: statusData.status === 'running',
       mt5Connected: statusData.mt5_connected || false,
-      host: 'localhost',
+      host: '154.61.187.189',
       port: 8080,
       message: 'Connect through MT5 bridge server for real trading',
       timestamp: statusData.timestamp
@@ -877,7 +877,7 @@ app.get('/api/analysis/top-signals', authenticateToken, async (req, res) => {
   try {
     // Try to connect to MT5 bridge server for real signals first
     try {
-      const mt5Response = await fetch('http://localhost:8080/api/mt5/positions');
+      const mt5Response = await fetch('http://154.61.187.189:8080/api/mt5/positions');
       
       if (mt5Response.ok) {
         const mt5Data = await mt5Response.json();
@@ -917,7 +917,7 @@ app.get('/api/analysis/signal-stats', authenticateToken, async (req, res) => {
   try {
     // Try to get real account info from MT5 first
     try {
-      const mt5Response = await fetch('http://localhost:8080/api/mt5/account-info');
+      const mt5Response = await fetch('http://154.61.187.189:8080/api/mt5/account-info');
       
       if (mt5Response.ok) {
         const accountData = await mt5Response.json();
@@ -975,8 +975,8 @@ app.get('/api/analysis/performance', authenticateToken, async (req, res) => {
     // Try to get real account info and positions from MT5 first
     try {
       const [accountResponse, positionsResponse] = await Promise.all([
-        fetch('http://localhost:8080/api/mt5/account-info'),
-        fetch('http://localhost:8080/api/mt5/positions')
+        fetch('http://154.61.187.189:8080/api/mt5/account-info'),
+        fetch('http://154.61.187.189:8080/api/mt5/positions')
       ]);
       
       if (accountResponse.ok) {
@@ -1049,7 +1049,7 @@ app.get('/api/analysis/ml/analytics', authenticateToken, async (req, res) => {
   try {
     // Try to get actual trading data to calculate real ML performance
     try {
-      const mt5Response = await fetch('http://localhost:8080/api/mt5/account-info');
+      const mt5Response = await fetch('http://154.61.187.189:8080/api/mt5/account-info');
       
       if (mt5Response.ok) {
         const accountData = await mt5Response.json();
@@ -1108,7 +1108,7 @@ app.post('/api/analysis/signal', authenticateToken, async (req, res) => {
     const { symbol = 'EURUSD' } = req.body;
     
     // Get real market data from MT5 for signal generation
-    const quotesResponse = await fetch('http://localhost:8080/api/mt5/quotes', {
+    const quotesResponse = await fetch('http://154.61.187.189:8080/api/mt5/quotes', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ symbols: [symbol] })
@@ -1164,7 +1164,7 @@ app.post('/api/analysis/predict', authenticateToken, async (req, res) => {
     const { symbol = 'EURUSD' } = req.body;
     
     // Get real market data first
-    const quotesResponse = await fetch('http://localhost:8080/api/mt5/quotes', {
+    const quotesResponse = await fetch('http://154.61.187.189:8080/api/mt5/quotes', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ symbols: [symbol] })
@@ -1214,7 +1214,7 @@ app.post('/api/analysis/predict', authenticateToken, async (req, res) => {
 app.get('/api/analysis/history', authenticateToken, async (req, res) => {
   try {
     // Get real trading history from MT5
-    const historyResponse = await fetch('http://localhost:8080/api/mt5/history', {
+    const historyResponse = await fetch('http://154.61.187.189:8080/api/mt5/history', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -1253,7 +1253,7 @@ app.get('/api/analysis/history', authenticateToken, async (req, res) => {
 app.get('/api/analysis/positions', authenticateToken, async (req, res) => {
   try {
     // Get real positions from MT5
-    const positionsResponse = await fetch('http://localhost:8080/api/mt5/positions');
+    const positionsResponse = await fetch('http://154.61.187.189:8080/api/mt5/positions');
     
     if (!positionsResponse.ok) {
       return res.status(503).json({
@@ -1288,14 +1288,14 @@ app.post('/api/analysis/force-generation', authenticateToken, async (req, res) =
     
     // Try to check MT5 connection first
     try {
-      const statusResponse = await fetch('http://localhost:8080/api/mt5/status');
+      const statusResponse = await fetch('http://154.61.187.189:8080/api/mt5/status');
       
       if (statusResponse.ok) {
         const statusData = await statusResponse.json();
         
         if (statusData.connected) {
           // Get real quotes for requested symbols
-          const quotesResponse = await fetch('http://localhost:8080/api/mt5/quotes', {
+          const quotesResponse = await fetch('http://154.61.187.189:8080/api/mt5/quotes', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ symbols })
@@ -1347,7 +1347,7 @@ app.get('/api/analysis/market-overview', authenticateToken, async (req, res) => 
   try {
     // Try to get real market data first
     try {
-      const quotesResponse = await fetch('http://localhost:8080/api/mt5/quotes', {
+      const quotesResponse = await fetch('http://154.61.187.189:8080/api/mt5/quotes', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ symbols: ['EURUSD', 'GBPUSD', 'USDJPY', 'AUDUSD', 'USDCAD'] })
@@ -1487,7 +1487,7 @@ app.post('/api/trading/positions/:positionId/close', authenticateToken, async (r
     
     // Try to close via MT5 first
     try {
-      const mt5Response = await fetch('http://localhost:8080/api/mt5/close-position', {
+      const mt5Response = await fetch('http://154.61.187.189:8080/api/mt5/close-position', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1540,7 +1540,7 @@ app.get('/api/ml/analytics', authenticateToken, async (req, res) => {
   try {
     // Try ML analytics with real trading performance data first
     try {
-      const mt5Response = await fetch('http://localhost:8080/api/mt5/account-info');
+      const mt5Response = await fetch('http://154.61.187.189:8080/api/mt5/account-info');
       
       if (mt5Response.ok) {
         const accountData = await mt5Response.json();
@@ -1758,7 +1758,7 @@ app.post('/api/ml/optimize-model', authenticateToken, async (req, res) => {
 app.post('/api/ml/train-model', authenticateToken, async (req, res) => {
   try {
     // Model training requires real historical data
-    const mt5Response = await fetch('http://localhost:8080/api/mt5/status');
+    const mt5Response = await fetch('http://154.61.187.189:8080/api/mt5/status');
     
     if (!mt5Response.ok) {
       return res.status(503).json({
@@ -1804,7 +1804,7 @@ app.post('/api/ml/detect-patterns', authenticateToken, async (req, res) => {
     }
     
     // Get real market data for pattern analysis
-    const historyResponse = await fetch('http://localhost:8080/api/mt5/history', {
+    const historyResponse = await fetch('http://154.61.187.189:8080/api/mt5/history', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ symbol, count: 200 })

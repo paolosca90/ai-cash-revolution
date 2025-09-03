@@ -15,15 +15,5 @@
       "src": "/(.*)",
       "dest": "simple-server.js"
     }
-  ],
-  "env": {
-    "NODE_ENV": "production",
-    "SUPABASE_URL": "@supabase-url",
-    "SUPABASE_ANON_KEY": "@supabase-anon-key"
-  },
-  "functions": {
-    "simple-server.js": {
-      "maxDuration": 30
-    }
-  }
+  ]
 }
