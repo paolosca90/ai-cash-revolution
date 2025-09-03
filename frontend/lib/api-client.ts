@@ -7,13 +7,16 @@ export class ApiClient {
     if (import.meta.env.PROD) {
       // Production: Use the production API URL
       this.baseURL = import.meta.env.VITE_PRODUCTION_API_URL || 
-        'https://backend-c10yefh44-paolos-projects-dc6990da.vercel.app';
+        'https://backend-1qun49w75-paolos-projects-dc6990da.vercel.app';
     } else {
       // Development: Use local Encore backend
       this.baseURL = import.meta.env.VITE_ENCORE_API_URL || 'http://localhost:4000';
     }
     
-    console.log(`API Client initialized with baseURL: ${this.baseURL}`);
+    // Production logging
+    if (import.meta.env.DEV) {
+      console.log(`🎯 AI Cash Revolution API initialized: ${this.baseURL}`);
+    }
   }
 
   // User authentication storage - separate from MT5 connection
